@@ -554,17 +554,20 @@ function saveContent(id){
   var cid=document.getElementById('cnt-search').value.trim();
   if(!cid){toast('确认单ID不能为空');return;}
   var cf=getConfirmById(cid);
+  if(!cf){toast('确认单不存在');return;}
   var q=getQuoteById(cf.quoteId);
   // 收集所有已填写的文件（按需，不强制全填）
   var files=[];
   var allRows=document.querySelectorAll('#cnt-files .platform-row');
   var hasAny=false;
   allRows.forEach(row=>{
-    var link=row.querySelector('input[type="text"]')?.value.trim();
-    var date=row.querySelector('input[type="date"]')?.value;
-    var label=row.querySelector('label')?.textContent;
-    // 获取reqId
-    var linkInput=row.querySelector('input[type="text"]');
+    // 查找链接输入框（id以cnt-link-开头）
+    var linkInput=row.querySelector('input[id^="cnt-link-"]');
+    var dateInput=row.querySelector('input[type="date"]');
+    var labelEl=row.querySelector('label');
+    var link=linkInput?linkInput.value.trim():'';
+    var date=dateInput?dateInput.value:'';
+    var label=labelEl?labelEl.textContent:'';
     var reqId=linkInput?linkInput.id.replace('cnt-link-',''):'';
     if(link){
       hasAny=true;
