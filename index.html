@@ -116,7 +116,7 @@ tr:hover td{background:var(--bg2)}
 <div class="toast" id="toast"></div>
 
 <script>
-// 全局数据
+// 数据层
 var KOLS=[],QUOTES=[],CONFIRMS=[],CONTENTS=[],PAYMENTS=[];
 var PLATFORMS=['TikTok','YouTube','Instagram'];
 var CONTENT_TYPES={TikTok:['video','comment'],YouTube:['shorts','comment'],Instagram:['reel','story','post']};
@@ -303,7 +303,7 @@ function saveQuote(id){
   save('QUOTES');renderQuoteTable();toast('报价单保存成功');document.getElementById('quote-modal')?.remove();
 }
 
-// ==================== 3. 确认单 ====================
+// ==================== 3. 确认单（改造版） ====================
 function generateConfirmId(accountName){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
   var prefix=`C-TR-${accountName}-${date}-`;
@@ -323,41 +323,105 @@ function renderConfirmTable(){
   tb.innerHTML=CONFIRMS.length===0?'<tr><td colspan="6" class="empty">暂无确认单</td></tr>':
     CONFIRMS.map(c=>{
       var q=getQuoteById(c.quoteId);
-      return `<tr><td><strong>${c.confirmId}</strong></td><td>${c.quoteId}</td><td>${c.accountName}</td><td>${c.deadline}</td><td><span class="badge ${c.signed?'b-signed':'b-pending'}">${c.signed?'已签字':'待签字'}</span></td><td><button class="action-btn" onclick="viewConfirm('${c.id}')">👁️</button><button class="action-btn del" onclick="if(confirm('删除？')){CONFIRMS=CONFIRMS.filter(x=>x.id!=='${c.id}');save('CONFIRMS');renderConfirmTable();}">✕</button></td></tr>`;
+      return `<tr><td><strong>${c.confirmId}</strong></td><td>${c.quoteId}</td><td>${c.accountName}</td><td>${c.deadline}</td><td><span class="badge ${c.signed?'b-signed':'b-pending'}">${c.signed?'已签字':'待签字'}</span></td><td><button class="action-btn" onclick="openConfirmForm('${c.id}')">✏️</button><button class="action-btn del" onclick="deleteConfirm('${c.id}')">✕</button></td></tr>`;
     }).join('');
 }
+
+function deleteConfirm(id){
+  if(!confirm('删除确认单将释放关联的报价单，确定吗？'))return;
+  var c=getConfirm(id);
+  if(c){
+    // 释放报价单
+    var q=getQuoteById(c.quoteId);
+    if(q){q.confirmed=false;save('QUOTES');}
+    CONFIRMS=CONFIRMS.filter(x=>x.id!==id);
+    save('CONFIRMS');
+    renderConfirmTable();
+    renderQuoteTable();
+    toast('确认单已删除');
+  }
+}
+
 function openConfirmForm(id){
   var cf=id?CONFIRMS.find(x=>x.id===id):null;
-  var quoteOptions=QUOTES.map(q=>`<option value="${q.quoteId}"${cf&&cf.quoteId===q.quoteId?' selected':''}>${q.quoteId} - ${q.accountName}</option>`).join('');
-  if(!quoteOptions)quoteOptions='<option value="">-- 请先创建报价单 --</option>';
-  var deadlineDefault=cf?cf.deadline:new Date(Date.now()+60*86400000).toISOString().slice(0,10);
-  var h=`<div class="modal-overlay" id="confirm-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>${cf?'编辑':'生成'}确认单</h3>
+  var isEdit=!!cf;
+  var accountName=cf?cf.accountName:'';
+  var selectedQuoteId=cf?cf.quoteId:'';
+  var deadline=cf?cf.deadline:new Date(Date.now()+60*86400000).toISOString().slice(0,10);
+  var email=cf?cf.email:'';
+
+  var h=`<div class="modal-overlay" id="confirm-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>${isEdit?'编辑':'生成'}确认单</h3>
     <div class="form-grid">
-      <div class="form-group"><label>关联报价单 *</label><select id="cnf-quote" onchange="previewConfirm()">${quoteOptions}</select></div>
-      <div class="form-group"><label>DDL</label><input type="date" id="cnf-deadline" value="${deadlineDefault}"></div>
-      <div class="form-group"><label>KOL Email</label><input type="email" id="cnf-email" value="${cf?cf.email:''}" placeholder="自动获取"></div>
+      <div class="form-group"><label>主播账号 *</label><div class="autocomplete-wrap">
+        <input id="cnf-kol" value="${accountName}" placeholder="输入账号" autocomplete="off" ${isEdit?'readonly':''}>
+        <div class="autocomplete-list" id="cnf-kol-list"></div>
+      </div></div>
+      <div class="form-group"><label>关联报价单 *</label><select id="cnf-quote" onchange="previewConfirm()" ${isEdit?'disabled':''}>
+        ${isEdit?`<option value="${selectedQuoteId}">${selectedQuoteId}</option>`:'<option value="">请先选择主播</option>'}
+      </select></div>
+      <div class="form-group"><label>DDL</label><input type="date" id="cnf-deadline" value="${deadline}" onchange="previewConfirm()"></div>
+      <div class="form-group"><label>KOL Email</label><input type="email" id="cnf-email" value="${email}" placeholder="自动获取"></div>
     </div>
     <div class="section" style="background:var(--bg2);margin-top:1rem;">
       <div class="section-header">📧 确认单文本 <button class="btn btn-xs" onclick="copyConfirmText()">📋 复制内容</button></div>
-      <div id="cnf-preview" style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg);border-radius:var(--radius);">请选择报价单...</div>
+      <div id="cnf-preview" style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg);border-radius:var(--radius);">${isEdit?previewText(cf):'请选择主播和报价单...'}</div>
     </div>
-    <div class="form-group" style="margin-top:1rem;"><label>上传签字截图</label><input type="file" id="sig-upload" accept="image/*" onchange="previewSignature(this)"></div>
-    <div id="sig-preview" style="margin-top:0.5rem;">${cf&&cf.signed?`<img src="${cf.signature}" style="max-width:300px;">`:''}</div>
-    <div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="saveConfirm('${cf?cf.id:''}')">保存确认单</button><button class="btn" onclick="document.getElementById('confirm-modal').remove()">取消</button></div></div></div>`;
+    <div class="form-group" style="margin-top:1rem;"><label>上传签字截图（可选）</label><input type="file" id="sig-upload" accept="image/*" onchange="previewSignature(this)"></div>
+    <div id="sig-preview" style="margin-top:0.5rem;">${cf&&cf.signed?`<img src="${cf.signature}" style="max-width:300px;"> <button class="btn btn-xs" onclick="clearSignature()">清除</button>`:''}</div>
+    <div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="saveConfirm('${cf?cf.id:''}')">保存</button><button class="btn" onclick="document.getElementById('confirm-modal').remove()">取消</button></div></div></div>`;
   document.body.insertAdjacentHTML('beforeend',h);
-  setTimeout(()=>previewConfirm(),200);
+
+  if(!isEdit){
+    setupAutocomplete('cnf-kol','cnf-kol-list',KOLS.map(k=>k.accountName));
+    var kolInput=document.getElementById('cnf-kol');
+    kolInput.addEventListener('input',function(){
+      updateQuoteSelectForAccount(this.value.trim());
+    });
+    kolInput.addEventListener('blur',function(){
+      setTimeout(()=>{
+        updateQuoteSelectForAccount(this.value.trim());
+      },200);
+    });
+  }else{
+    // 编辑模式直接预览
+    setTimeout(()=>previewConfirm(),200);
+  }
 }
-function previewConfirm(){
-  var qid=document.getElementById('cnf-quote').value;
-  var q=getQuoteById(qid);
-  if(!q){document.getElementById('cnf-preview').textContent='请选择报价单...';return;}
-  var kol=KOLS.find(k=>k.accountName===q.accountName);
-  if(kol&&kol.email)document.getElementById('cnf-email').value=kol.email;
-  var deadline=document.getElementById('cnf-deadline').value;
+
+function updateQuoteSelectForAccount(account){
+  var sel=document.getElementById('cnf-quote');
+  if(!sel)return;
+  // 找出该账号的未关联报价单
+  var usedQuoteIds=CONFIRMS.map(c=>c.quoteId);
+  var available=QUOTES.filter(q=>q.accountName===account && !usedQuoteIds.includes(q.quoteId));
+  if(available.length===0){
+    sel.innerHTML='<option value="">无可用报价单</option>';
+  }else{
+    sel.innerHTML=available.map(q=>`<option value="${q.quoteId}">${q.quoteId} (${q.lines.map(l=>l.platform+'/'+l.contentType).join(', ')})</option>`).join('');
+  }
+  previewConfirm();
+}
+
+function previewText(cf){
+  if(!cf)return '';
+  var q=getQuoteById(cf.quoteId);
+  if(!q)return '报价单不存在';
+  return buildConfirmText(q,cf.deadline);
+}
+function buildConfirmText(q,deadline){
   var lines=q.lines.map(l=>`${l.platform}: ${l.count}${l.contentType}`).join('\n');
   var total=q.lines.reduce((s,l)=>s+l.amount*l.count,0);
-  var text=`Merhaba ${q.accountName},\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: ${[...new Set(q.lines.map(l=>l.platform))].join(', ')}\n- İçerik: ${lines}\n- Paylaşım Tarihi (DDL): ${deadline}\n- Ücret: $${total.toFixed(2)}\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.`;
-  document.getElementById('cnf-preview').textContent=text;
+  return `Merhaba ${q.accountName},\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: ${[...new Set(q.lines.map(l=>l.platform))].join(', ')}\n- İçerik: ${lines}\n- Paylaşım Tarihi (DDL): ${deadline}\n- Ücret: $${total.toFixed(2)}\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.`;
+}
+function previewConfirm(){
+  var sel=document.getElementById('cnf-quote');
+  var deadline=document.getElementById('cnf-deadline').value;
+  if(!sel||!sel.value){document.getElementById('cnf-preview').textContent='请选择报价单';return;}
+  var q=getQuoteById(sel.value);
+  if(!q){document.getElementById('cnf-preview').textContent='报价单不存在';return;}
+  document.getElementById('cnf-preview').textContent=buildConfirmText(q,deadline);
+  var kol=getKol(q.accountName);
+  if(kol&&kol.email)document.getElementById('cnf-email').value=kol.email;
 }
 function copyConfirmText(){
   var text=document.getElementById('cnf-preview').textContent;
@@ -367,21 +431,40 @@ function previewSignature(input){
   var file=input.files[0];
   if(file){
     var reader=new FileReader();
-    reader.onload=e=>{document.getElementById('sig-preview').innerHTML=`<img src="${e.target.result}" style="max-width:300px;">`;};
+    reader.onload=e=>{
+      var prev=document.getElementById('sig-preview');
+      prev.innerHTML=`<img src="${e.target.result}" style="max-width:300px;"> <button class="btn btn-xs" onclick="clearSignature()">清除</button>`;
+    };
     reader.readAsDataURL(file);
   }
 }
+function clearSignature(){
+  document.getElementById('sig-upload').value='';
+  document.getElementById('sig-preview').innerHTML='';
+}
 function saveConfirm(id){
-  var qid=document.getElementById('cnf-quote').value;
-  if(!qid){toast('请选择报价单');return;}
-  var q=getQuoteById(qid);
+  var kolInput=document.getElementById('cnf-kol');
+  var accountName=kolInput?kolInput.value.trim():'';
+  var sel=document.getElementById('cnf-quote');
+  var quoteId=sel?sel.value:'';
+  if(!accountName){toast('请选择主播');return;}
+  if(!quoteId){toast('请选择报价单');return;}
+
+  // 一对一检查：新建时该报价单不能已被其他确认单关联
+  if(!id){
+    var existing=CONFIRMS.find(c=>c.quoteId===quoteId);
+    if(existing){toast('该报价单已有关联确认单，不能重复生成');return;}
+  }
+
+  var q=getQuoteById(quoteId);
   var sigFile=document.getElementById('sig-upload').files[0];
-  var cf=id?CONFIRMS.find(x=>x.id===id):null;
+  var old=id?CONFIRMS.find(x=>x.id===id):null;
+
   function finish(sigData){
     var d={
       id:id||genId('cnf'),
-      confirmId:cf?cf.confirmId:generateConfirmId(q.accountName),
-      quoteId:qid,
+      confirmId:old?old.confirmId:generateConfirmId(accountName),
+      quoteId:quoteId,
       accountName:q.accountName,
       email:document.getElementById('cnf-email').value.trim(),
       deadline:document.getElementById('cnf-deadline').value,
@@ -390,28 +473,24 @@ function saveConfirm(id){
     };
     if(id){var i=CONFIRMS.findIndex(x=>x.id===id);if(i>-1)CONFIRMS[i]=d;}
     else{CONFIRMS.push(d);}
-    if(d.signed){var qi=QUOTES.findIndex(x=>x.quoteId===qid);if(qi>-1)QUOTES[qi].confirmed=true;save('QUOTES');}
-    save('CONFIRMS');renderConfirmTable();toast('确认单保存成功');document.getElementById('confirm-modal')?.remove();
+
+    // 标记报价单为已确认
+    q.confirmed=true;
+    save('QUOTES');
+    save('CONFIRMS');
+    renderConfirmTable();
+    renderQuoteTable();
+    toast('确认单保存成功');
+    document.getElementById('confirm-modal')?.remove();
   }
+
   if(sigFile){
     var reader=new FileReader();
     reader.onload=e=>finish(e.target.result);
     reader.readAsDataURL(sigFile);
   }else{
-    finish(cf?cf.signature:'');
+    finish(old?old.signature:'');
   }
-}
-function viewConfirm(id){
-  var c=getConfirm(id);if(!c)return;
-  var q=getQuoteById(c.quoteId);
-  var lines=q?q.lines.map(l=>`${l.platform}: ${l.count}${l.contentType}`).join('\n'):'';
-  var total=q?q.lines.reduce((s,l)=>s+l.amount*l.count,0):0;
-  var text=`Merhaba ${c.accountName},\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: ${q?[...new Set(q.lines.map(l=>l.platform))].join(', '):''}\n- İçerik: ${lines}\n- Paylaşım Tarihi (DDL): ${c.deadline}\n- Ücret: $${total.toFixed(2)}\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.`;
-  var h=`<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>确认单 ${c.confirmId}</h3>
-    <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg2);border-radius:var(--radius);">${text}</div>
-    ${c.signed?`<div style="margin-top:1rem;"><strong>签字截图：</strong><br><img src="${c.signature}" style="max-width:300px;"></div>`:'<p style="color:var(--text2);">未上传签字截图</p>'}
-    <button class="btn" style="margin-top:1rem;" onclick="this.closest('.modal-overlay').remove()">关闭</button></div></div>`;
-  document.body.insertAdjacentHTML('beforeend',h);
 }
 
 // ==================== 4. 内容上传 ====================
