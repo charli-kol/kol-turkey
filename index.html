@@ -319,21 +319,24 @@ function saveQuote(id){
   if(!accountName){toast('请输入主播账号');return;}
   var totalPrice=parseFloat(document.getElementById('qf-total').value)||0;
   if(totalPrice<=0){toast('请填写组合总价');return;}
-  var lines=[];
+  var quoteLines=[];
   document.querySelectorAll('#qf-lines .platform-row').forEach(row=>{
     var p=row.querySelector('select[id^="ql-platform-"]')?.value;
     var t=row.querySelector('select[id^="ql-type-"]')?.value;
     var c=parseInt(row.querySelector('input[id^="ql-count-"]')?.value)||0;
-    if(p&&t&&c>0)lines.push({platform:p,contentType:t,count:c});
+    if(p&&t&&c>0)quoteLines.push({platform:p,contentType:t,count:c});
   });
-  if(!lines.length){toast('请至少添加一条明细');return;}
-  var unitPrice=calcUnitPrice(lines,totalPrice);
-  lines.forEach(l=>{l.unitPrice=unitPrice;l.subtotal=unitPrice*(RATIO[l.contentType]||1)*l.count;});
+  if(!quoteLines.length){toast('请至少添加一条明细');return;}
+  var unitPrice=calcUnitPrice(quoteLines,totalPrice);
+  quoteLines.forEach(l=>{l.unitPrice=unitPrice;l.subtotal=unitPrice*(RATIO[l.contentType]||1)*l.count;});
   var old=id?QUOTES.find(x=>x.id===id):null;
   var d={
     id:id||genId('qt'),
-    quoteId:old?old.quoteId:generateQuoteId(accountName,lines),
-    accountName,totalPrice,lines,unitPrice,
+    quoteId:old?old.quoteId:generateQuoteId(accountName,quoteLines),
+    accountName:accountName,
+    totalPrice:totalPrice,
+    lines:quoteLines,
+    unitPrice:unitPrice,
     note:document.getElementById('qf-note').value.trim(),
     confirmed:old?old.confirmed:false,
     createdAt:old?old.createdAt:new Date().toISOString().slice(0,10)
