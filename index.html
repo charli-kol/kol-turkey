@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>土耳其KOL推广管理系统 </title>
+<title>土耳其KOL推广管理系统 v4</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -90,7 +90,7 @@ tr:hover td{background:var(--bg2)}
 <div class="container">
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:16px;">
-  <div><h1 style="font-size:22px;font-weight:700;">🇹🇷 土耳其KOL推广管理 v3</h1></div>
+  <div><h1 style="font-size:22px;font-weight:700;">🇹🇷 土耳其KOL推广管理 v4</h1></div>
   <div style="display:flex;gap:8px;">
     <button class="btn btn-sm" onclick="exportAll()">📦 导出备份</button>
     <button class="btn btn-sm" onclick="document.getElementById('import-file').click()">📥 导入备份</button>
@@ -131,9 +131,7 @@ function saveAll(){['KOLS','QUOTES','CONFIRMS','CONTENTS','PAYMENTS'].forEach(k=
 function toast(m){var e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(window._tt);window._tt=setTimeout(()=>e.classList.remove('show'),2500);}
 function genId(p){return p+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);}
 function getKol(name){return KOLS.find(k=>k.accountName===name);}
-function getQuote(id){return QUOTES.find(q=>q.id===id);}
 function getQuoteById(qid){return QUOTES.find(q=>q.quoteId===qid);}
-function getConfirm(id){return CONFIRMS.find(c=>c.id===id);}
 function getConfirmById(cid){return CONFIRMS.find(c=>c.confirmId===cid);}
 
 load();
@@ -199,10 +197,9 @@ function saveKOL(id){
   save('KOLS');renderKOLTable();toast('保存成功');document.getElementById('kol-modal')?.remove();
 }
 
-// ==================== 2. 报价管理（ID含平台） ====================
+// ==================== 2. 报价管理 ====================
 function generateQuoteId(accountName, lines){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
-  // 提取所有平台
   var platforms = [...new Set(lines.map(l=>l.platform))];
   var platformStr = platforms.length===1 ? platforms[0] : 'Multi';
   var prefix = `Q-TR-${accountName}-${platformStr}-${date}-`;
@@ -306,7 +303,7 @@ function saveQuote(id){
   save('QUOTES');renderQuoteTable();toast('报价单保存成功');document.getElementById('quote-modal')?.remove();
 }
 
-// ==================== 3. 确认单（与之前一致，无改动） ====================
+// ==================== 3. 确认单（签字后才联动报价单状态） ====================
 function generateConfirmId(accountName){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
   var prefix=`C-TR-${accountName}-${date}-`;
@@ -317,29 +314,30 @@ function renderConfirm(){
   document.getElementById('page-confirm').innerHTML=`
     <div class="section">
       <div class="section-header"><span>📝 确认单列表（${CONFIRMS.length}份）</span><button class="btn btn-primary btn-sm" onclick="openConfirmForm()">+ 生成确认单</button></div>
+      <input type="text" id="confirm-search" placeholder="搜索确认单ID..." style="width:280px;margin-bottom:1rem;" oninput="renderConfirmTable()">
       <div class="table-wrap"><table><thead><tr><th>确认单ID</th><th>关联报价单</th><th>主播</th><th>DDL</th><th>签字状态</th><th>操作</th></tr></thead><tbody id="confirm-tbody"></tbody></table></div>
     </div>`;
   renderConfirmTable();
 }
 function renderConfirmTable(){
+  var s=(document.getElementById('confirm-search')?.value||'').toLowerCase();
+  var list=CONFIRMS.filter(c=>c.confirmId.toLowerCase().includes(s));
   var tb=document.getElementById('confirm-tbody');
-  tb.innerHTML=CONFIRMS.length===0?'<tr><td colspan="6" class="empty">暂无确认单</td></tr>':
-    CONFIRMS.map(c=>{
-      var q=getQuoteById(c.quoteId);
-      return `<tr><td><strong>${c.confirmId}</strong></td><td>${c.quoteId}</td><td>${c.accountName}</td><td>${c.deadline}</td><td><span class="badge ${c.signed?'b-signed':'b-pending'}">${c.signed?'已签字':'待签字'}</span></td><td><button class="action-btn" onclick="openConfirmForm('${c.id}')">✏️</button><button class="action-btn del" onclick="deleteConfirm('${c.id}')">✕</button></td></tr>`;
-    }).join('');
+  tb.innerHTML=list.length===0?'<tr><td colspan="6" class="empty">暂无确认单</td></tr>':
+    list.map(c=>`<tr><td><strong>${c.confirmId}</strong></td><td>${c.quoteId}</td><td>${c.accountName}</td><td>${c.deadline}</td><td><span class="badge ${c.signed?'b-signed':'b-pending'}">${c.signed?'已签字':'待签字'}</span></td><td><button class="action-btn" onclick="openConfirmForm('${c.id}')">✏️</button><button class="action-btn del" onclick="deleteConfirm('${c.id}')">✕</button></td></tr>`).join('');
 }
 function deleteConfirm(id){
   if(!confirm('删除确认单将释放关联的报价单，确定吗？'))return;
-  var c=getConfirm(id);
+  var c=CONFIRMS.find(x=>x.id===id);
   if(c){
+    // 释放报价单状态
     var q=getQuoteById(c.quoteId);
     if(q){q.confirmed=false;save('QUOTES');}
     CONFIRMS=CONFIRMS.filter(x=>x.id!==id);
     save('CONFIRMS');
     renderConfirmTable();
     renderQuoteTable();
-    toast('确认单已删除');
+    toast('确认单已删除，报价单已释放');
   }
 }
 function openConfirmForm(id){
@@ -365,8 +363,8 @@ function openConfirmForm(id){
       <div class="section-header">📧 确认单文本 <button class="btn btn-xs" onclick="copyConfirmText()">📋 复制内容</button></div>
       <div id="cnf-preview" style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg);border-radius:var(--radius);">${isEdit?previewText(cf):'请选择主播和报价单...'}</div>
     </div>
-    <div class="form-group" style="margin-top:1rem;"><label>上传签字截图（可选）</label><input type="file" id="sig-upload" accept="image/*" onchange="previewSignature(this)"></div>
-    <div id="sig-preview" style="margin-top:0.5rem;">${cf&&cf.signed?`<img src="${cf.signature}" style="max-width:300px;"> <button class="btn btn-xs" onclick="clearSignature()">清除</button>`:''}</div>
+    <div class="form-group" style="margin-top:1rem;"><label>上传签字截图（上传后报价单自动确认）</label><input type="file" id="sig-upload" accept="image/*" onchange="previewSignature(this)"></div>
+    <div id="sig-preview" style="margin-top:0.5rem;">${cf&&cf.signed?`<img src="${cf.signature}" style="max-width:300px;"> <button class="btn btn-xs" onclick="clearSignature()">清除（将取消报价确认）</button>`:''}</div>
     <div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="saveConfirm('${cf?cf.id:''}')">保存</button><button class="btn" onclick="document.getElementById('confirm-modal').remove()">取消</button></div></div></div>`;
   document.body.insertAdjacentHTML('beforeend',h);
   if(!isEdit){
@@ -434,39 +432,55 @@ function saveConfirm(id){
   if(!quoteId){toast('请选择报价单');return;}
   if(!id){
     var existing=CONFIRMS.find(c=>c.quoteId===quoteId);
-    if(existing){toast('该报价单已有关联确认单，不能重复生成');return;}
+    if(existing){toast('该报价单已有关联确认单');return;}
   }
   var q=getQuoteById(quoteId);
   var sigFile=document.getElementById('sig-upload').files[0];
   var old=id?CONFIRMS.find(x=>x.id===id):null;
+
   function finish(sigData){
+    var wasSigned = old?old.signed:false;
+    var nowSigned = !!sigData;
     var d={
       id:id||genId('cnf'),
       confirmId:old?old.confirmId:generateConfirmId(accountName),
       quoteId,accountName:q.accountName,
       email:document.getElementById('cnf-email').value.trim(),
       deadline:document.getElementById('cnf-deadline').value,
-      signed:!!sigData,
+      signed:nowSigned,
       signature:sigData||''
     };
     if(id){var i=CONFIRMS.findIndex(x=>x.id===id);if(i>-1)CONFIRMS[i]=d;}
     else{CONFIRMS.push(d);}
-    q.confirmed=true;
+
+    // 核心逻辑：报价单状态仅跟随签字状态
+    if(nowSigned && !wasSigned){
+      // 刚签字，确认报价单
+      q.confirmed=true;
+      toast('签字已上传，报价单自动确认');
+    } else if(!nowSigned && wasSigned){
+      // 清除了签字，取消报价单确认
+      q.confirmed=false;
+      toast('签字已清除，报价单取消确认');
+    }
+    // 如果本来就是未签字，保存也不影响报价单
     save('QUOTES');
     save('CONFIRMS');
     renderConfirmTable();
     renderQuoteTable();
-    toast('确认单保存成功');
     document.getElementById('confirm-modal')?.remove();
   }
+
   if(sigFile){
     var reader=new FileReader();
     reader.onload=e=>finish(e.target.result);
     reader.readAsDataURL(sigFile);
-  }else{ finish(old?old.signature:''); }
+  }else{
+    finish(old?old.signature:'');
+  }
 }
 
-// ==================== 4. 内容上传（改造：搜索确认单ID，限制上传） ====================
+// ==================== 4. 内容上传（严格匹配报价单） ====================
 function generateContentId(accountName){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
   var prefix=`CT-TR-${accountName}-${date}-`;
@@ -477,19 +491,19 @@ function renderContent(){
   document.getElementById('page-content').innerHTML=`
     <div class="section">
       <div class="section-header"><span>📤 合作内容列表（${CONTENTS.length}条）</span><button class="btn btn-primary btn-sm" onclick="openContentForm()">+ 上传内容</button></div>
+      <input type="text" id="content-search" placeholder="搜索内容ID..." style="width:280px;margin-bottom:1rem;" oninput="renderContentTable()">
       <div class="table-wrap"><table><thead><tr><th>内容ID</th><th>确认单</th><th>主播</th><th>发布日期</th><th>文件</th><th>操作</th></tr></thead><tbody id="content-tbody"></tbody></table></div>
     </div>`;
   renderContentTable();
 }
 function renderContentTable(){
+  var s=(document.getElementById('content-search')?.value||'').toLowerCase();
+  var list=CONTENTS.filter(c=>c.contentId.toLowerCase().includes(s));
   var tb=document.getElementById('content-tbody');
-  tb.innerHTML=CONTENTS.length===0?'<tr><td colspan="6" class="empty">暂无内容</td></tr>':
-    CONTENTS.map(ct=>{
+  tb.innerHTML=list.length===0?'<tr><td colspan="6" class="empty">暂无内容</td></tr>':
+    list.map(ct=>{
       var cf=getConfirmById(ct.confirmId);
-      var filesHtml=(ct.files||[]).map(f=>{
-        if(f.name&&f.name.startsWith('http'))return `<a href="${f.name}" target="_blank">${f.type}</a>`;
-        return f.type+': '+f.name;
-      }).join(', ');
+      var filesHtml=(ct.files||[]).map(f=>`<a href="${f.link}" target="_blank">${f.type}</a>`).join(', ');
       return `<tr><td><strong>${ct.contentId}</strong></td><td>${ct.confirmId}</td><td>${cf?cf.accountName:'—'}</td><td>${ct.publishDate||'—'}</td><td>${filesHtml||'—'}</td><td><button class="action-btn" onclick="openContentForm('${ct.id}')">✏️</button><button class="action-btn del" onclick="if(confirm('删除？')){CONTENTS=CONTENTS.filter(x=>x.id!=='${ct.id}');save('CONTENTS');renderContentTable();}">✕</button></td></tr>`;
     }).join('');
 }
@@ -502,142 +516,64 @@ function openContentForm(id){
     </div>
     <button class="btn btn-sm" onclick="searchConfirmForContent()">🔍 查询确认单</button>
     <div id="cnt-info" style="margin:1rem 0; padding:1rem; background:var(--bg2); border-radius:var(--radius); display:none;"></div>
-    <div style="margin:1rem 0;" id="cnt-upload-section" style="display:none;">
-      <strong>上传文件（根据报价单限制）</strong>
+    <div id="cnt-upload-section" style="display:none; margin-top:1rem;">
+      <strong>上传文件（必须与报价单一致）</strong>
       <div id="cnt-files"></div>
-      <button class="btn btn-sm" onclick="addContentFile()">+ 添加</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:1rem;">
-      <button class="btn btn-primary" onclick="saveContent('${ct?ct.id:''}')">保存</button>
+      <button class="btn btn-primary" id="cnt-save-btn" style="display:none;" onclick="saveContent('${ct?ct.id:''}')">保存</button>
       <button class="btn" onclick="document.getElementById('content-modal').remove()">取消</button>
     </div></div></div>`;
   document.body.insertAdjacentHTML('beforeend',h);
-  if(ct){
-    // 编辑模式，自动加载已上传文件列表，需重新查询确认单
-    searchConfirmForContent(ct.confirmId);
-    // 同时加载已存在的文件
-  }
+  if(ct) searchConfirmForContent(ct.confirmId);
 }
 function searchConfirmForContent(forceCid){
   var cid = forceCid || document.getElementById('cnt-search').value.trim();
   if(!cid){toast('请输入确认单ID');return;}
   var cf = getConfirmById(cid);
   if(!cf){toast('确认单不存在');return;}
+  if(!cf.signed){toast('确认单尚未签字，无法上传内容');return;}
   var q = getQuoteById(cf.quoteId);
   if(!q){toast('报价单丢失');return;}
-  // 显示确认单信息
+  // 显示信息
   var infoDiv = document.getElementById('cnt-info');
   infoDiv.style.display='block';
-  infoDiv.innerHTML = `<strong>确认单：${cid}</strong><br>
-    主播：${cf.accountName} | DDL：${cf.deadline}<br>
-    报价明细：${q.lines.map(l=>`${l.platform}/${l.contentType}: ${l.count}个`).join(', ')}<br>
-    已上传次数：${CONTENTS.filter(c=>c.confirmId===cid).length}`;
-  // 生成上传区域，根据报价单明细限制
+  infoDiv.innerHTML = `<strong>确认单：${cid}</strong> | 主播：${cf.accountName} | DDL：${cf.deadline}`;
+  // 构建上传区域：根据报价单明细逐条生成
   var uploadSection = document.getElementById('cnt-upload-section');
   uploadSection.style.display='block';
   var filesDiv = document.getElementById('cnt-files');
-  // 如果编辑，显示已有文件，否则为空
-  var existingFiles = [];
-  if(document.getElementById('cnt-search').readOnly){
-    // 编辑模式，从CONTENTS中取
-    var ct = CONTENTS.find(c=>c.id===document.querySelector('#content-modal').dataset?.editId);
-    if(!ct){ // 简单方式
-      var editId = window._editContentId;
-      if(editId) ct = CONTENTS.find(c=>c.id===editId);
-    }
-    if(ct) existingFiles = ct.files || [];
-  }
-  // 清除原有内容
   filesDiv.innerHTML = '';
-  // 添加文件行
-  var addBtn = filesDiv.parentElement.querySelector('button');
-  // 移除旧的添加按钮，重新构建
-  if(existingFiles.length>0){
-    existingFiles.forEach((f,i)=>filesDiv.innerHTML += buildContentFile(f,i));
-  } else {
-    // 默认加一行空
-    filesDiv.innerHTML = buildContentFile({},0);
-  }
-}
-// 为了编辑时传递ID
-window._editContentId = null;
-function openContentForm(id){
-  window._editContentId = id;
-  // ... 原openContentForm逻辑
-  // 修改调用searchConfirmForContent的部分
-  var ct=id?CONTENTS.find(x=>x.id===id):null;
-  var h=`<div class="modal-overlay" id="content-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>${ct?'编辑':'上传'}合作内容</h3>
-    <div class="form-grid">
-      <div class="form-group"><label>确认单ID *</label><input id="cnt-search" value="${ct?ct.confirmId:''}" placeholder="输入确认单ID查询" ${ct?'readonly':''}></div>
-      <div class="form-group"><label>发布日期</label><input type="date" id="cnt-publish-date" value="${ct?ct.publishDate:new Date().toISOString().slice(0,10)}"></div>
-    </div>
-    <button class="btn btn-sm" onclick="searchConfirmForContent()">🔍 查询确认单</button>
-    <div id="cnt-info" style="margin:1rem 0; padding:1rem; background:var(--bg2); border-radius:var(--radius); display:none;"></div>
-    <div id="cnt-upload-section" style="display:none; margin-top:1rem;">
-      <strong>上传文件（根据报价单限制）</strong>
-      <div id="cnt-files"></div>
-      <button class="btn btn-sm" onclick="addContentFile()">+ 添加</button>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:1rem;">
-      <button class="btn btn-primary" onclick="saveContent('${ct?ct.id:''}')">保存</button>
-      <button class="btn" onclick="document.getElementById('content-modal').remove();window._editContentId=null;">取消</button>
-    </div></div></div>`;
-  document.body.insertAdjacentHTML('beforeend',h);
-  if(ct){
-    // 自动查询并加载已有文件
-    searchConfirmForContent(ct.confirmId);
-  }
-}
-function buildContentFile(f,i){
-  return `<div class="platform-row" id="cnt-file-${i}">
-    <div class="form-group"><label>类型</label><select id="cnt-type-${i}" style="width:100px;"><option value="reel"${f.type==='reel'?' selected':''}>Reel</option><option value="story"${f.type==='story'?' selected':''}>Story</option><option value="post"${f.type==='post'?' selected':''}>Post</option><option value="video"${f.type==='video'?' selected':''}>Video</option><option value="shorts"${f.type==='shorts'?' selected':''}>Shorts</option><option value="截图"${f.type==='截图'?' selected':''}>截图</option></select></div>
-    <div class="form-group"><label>链接/文件名</label><input id="cnt-file-${i}" value="${f.name||''}" placeholder="https://..."></div>
-    <button class="action-btn del" onclick="document.getElementById('cnt-file-${i}').remove()">✕</button></div>`;
-}
-function addContentFile(){
-  var i=document.querySelectorAll('#cnt-files .platform-row').length;
-  var div=document.createElement('div');div.innerHTML=buildContentFile({},i);
-  document.getElementById('cnt-files').appendChild(div.firstElementChild);
+  q.lines.forEach((l,idx)=>{
+    for(var j=0; j<l.count; j++){
+      var reqId = `req-${idx}-${j}`;
+      var row = document.createElement('div');
+      row.className = 'platform-row';
+      row.innerHTML = `
+        <div class="form-group"><label>${l.platform} ${l.contentType} #${j+1}</label><input id="cnt-link-${reqId}" placeholder="输入发布链接" style="width:250px;"></div>
+        <div class="form-group"><label>日期</label><input type="date" id="cnt-date-${reqId}" value="${document.getElementById('cnt-publish-date')?.value || ''}"></div>`;
+      filesDiv.appendChild(row);
+    }
+  });
+  document.getElementById('cnt-save-btn').style.display='inline-flex';
 }
 function saveContent(id){
   var cid = document.getElementById('cnt-search').value.trim();
   if(!cid){toast('确认单ID不能为空');return;}
   var cf = getConfirmById(cid);
-  if(!cf){toast('确认单不存在');return;}
   var q = getQuoteById(cf.quoteId);
-  if(!q)return;
-  // 获取当前上传的文件
+  // 收集所有必填链接
   var files=[];
-  document.querySelectorAll('#cnt-files .platform-row').forEach(row=>{
-    var t=row.querySelector('select').value;
-    var n=row.querySelector('input').value.trim();
-    if(t&&n)files.push({type:t,name:n});
+  var allInputs = document.querySelectorAll('#cnt-files .platform-row');
+  var miss=false;
+  allInputs.forEach(row=>{
+    var link = row.querySelector('input[type="text"]')?.value.trim();
+    var date = row.querySelector('input[type="date"]')?.value;
+    var label = row.querySelector('label')?.textContent;
+    if(!link){ miss=true; toast(`请填写 ${label} 的链接`); }
+    files.push({type:label, link:link, date:date});
   });
-  // 限制检查：与报价单对比
-  // 报价单明细期望的类型和数量
-  var expected = {};
-  q.lines.forEach(l=>{
-    var key = l.platform+'/'+l.contentType;
-    if(!expected[key]) expected[key]=0;
-    expected[key] += l.count;
-  });
-  // 统计上传的类型数量
-  var uploaded = {};
-  files.forEach(f=>{
-    // 注意：类型可能是reel/video等，需要映射到平台/内容类型？简单处理直接使用类型
-    if(!uploaded[f.type]) uploaded[f.type]=0;
-    uploaded[f.type]++;
-  });
-  // 由于内容类型如video可能来自不同平台，但这里我们就按原样检查，但不强制平台对应，只检查数量
-  // 简单限制：总的文件数不能超过总需求？或者精确匹配。
-  // 这里为了严格，我们要求每个报价明细对应的内容类型数量不能超过需求，且至少上传一个链接即可保存。
-  // 粗略检查总数量不超过报价单总数量
-  var totalRequired = Object.values(expected).reduce((s,v)=>s+v,0);
-  if(files.length > totalRequired){
-    toast(`最多上传 ${totalRequired} 个文件，当前 ${files.length} 个`);
-    return;
-  }
-  // 另外可检查具体类型，但类型映射复杂，暂略
+  if(miss) return;
   var ct=id?CONTENTS.find(x=>x.id===id):null;
   var d={
     id:id||genId('cnt'),
@@ -649,22 +585,31 @@ function saveContent(id){
   };
   if(id){var i=CONTENTS.findIndex(x=>x.id===id);if(i>-1)CONTENTS[i]=d;}
   else{CONTENTS.push(d);}
-  save('CONTENTS');renderContentTable();toast('内容保存成功');document.getElementById('content-modal')?.remove();window._editContentId=null;
+  save('CONTENTS');renderContentTable();toast('内容保存成功');document.getElementById('content-modal')?.remove();
 }
 
-// ==================== 5. 付款（改造：搜索确认单ID） ====================
+// ==================== 5. 付款（搜索确认单ID，自动金额，ID优化） ====================
+function generatePaymentId(accountName){
+  var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var prefix=`P-TR-${accountName}-${date}-`;
+  var count=PAYMENTS.filter(p=>p.paymentId.startsWith(prefix)).length+1;
+  return prefix+String(count).padStart(2,'0');
+}
 function renderPayment(){
   document.getElementById('page-payment').innerHTML=`
     <div class="section">
       <div class="section-header"><span>💳 付款列表（${PAYMENTS.length}笔）</span><button class="btn btn-primary btn-sm" onclick="openPaymentForm()">+ 新建付款</button></div>
+      <input type="text" id="payment-search" placeholder="搜索付款单ID..." style="width:280px;margin-bottom:1rem;" oninput="renderPaymentTable()">
       <div class="table-wrap"><table><thead><tr><th>付款单ID</th><th>确认单</th><th>主播</th><th>金额</th><th>日期</th><th>状态</th><th>操作</th></tr></thead><tbody id="payment-tbody"></tbody></table></div>
     </div>`;
   renderPaymentTable();
 }
 function renderPaymentTable(){
+  var s=(document.getElementById('payment-search')?.value||'').toLowerCase();
+  var list=PAYMENTS.filter(p=>p.paymentId.toLowerCase().includes(s));
   var tb=document.getElementById('payment-tbody');
-  tb.innerHTML=PAYMENTS.length===0?'<tr><td colspan="7" class="empty">暂无付款</td></tr>':
-    PAYMENTS.map(p=>{
+  tb.innerHTML=list.length===0?'<tr><td colspan="7" class="empty">暂无付款</td></tr>':
+    list.map(p=>{
       var cf=getConfirmById(p.confirmId);
       return `<tr><td><strong>${p.paymentId}</strong></td><td>${p.confirmId}</td><td>${cf?cf.accountName:'—'}</td><td>$${p.amount.toFixed(2)}</td><td>${p.paymentDate}</td><td><span class="badge ${p.paid?'b-paid':'b-unpaid'}">${p.paid?'已付':'待付'}</span></td><td><button class="action-btn" onclick="openPaymentForm('${p.id}')">✏️</button><button class="action-btn del" onclick="if(confirm('删除？')){PAYMENTS=PAYMENTS.filter(x=>x.id!=='${p.id}');save('PAYMENTS');renderPaymentTable();}">✕</button></td></tr>`;
     }).join('');
@@ -674,7 +619,7 @@ function openPaymentForm(id){
   var h=`<div class="modal-overlay" id="payment-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>${p?'编辑':'新建'}付款</h3>
     <div class="form-grid">
       <div class="form-group"><label>确认单ID *</label><input id="pm-search" value="${p?p.confirmId:''}" placeholder="输入确认单ID" ${p?'readonly':''}></div>
-      <div class="form-group"><label>金额($)</label><input type="number" id="pm-amount" step="0.01" value="${p?p.amount:''}" readonly></div>
+      <div class="form-group"><label>金额($) <small>(自动)</small></label><input type="number" id="pm-amount" step="0.01" value="${p?p.amount:''}" readonly></div>
       <div class="form-group"><label>付款日期</label><input type="date" id="pm-date" value="${p?p.paymentDate:new Date().toISOString().slice(0,10)}"></div>
       <div class="form-group"><label>状态</label><select id="pm-paid"><option value="0"${p&&!p.paid?' selected':''}>待付款</option><option value="1"${p&&p.paid?' selected':''}>已付款</option></select></div>
       <div class="form-group"><label>备注</label><input id="pm-note" value="${p?p.note:''}"></div>
@@ -696,7 +641,7 @@ function searchConfirmForPayment(forceCid){
   document.getElementById('pm-amount').value = total.toFixed(2);
   var infoDiv = document.getElementById('pm-info');
   infoDiv.style.display='block';
-  infoDiv.innerHTML = `确认单：${cid}<br>主播：${cf.accountName} | 应付金额：$${total.toFixed(2)}`;
+  infoDiv.innerHTML = `确认单：${cid} | 主播：${cf.accountName} | 应付：$${total.toFixed(2)}`;
 }
 function savePayment(id){
   var cid = document.getElementById('pm-search').value.trim();
@@ -704,17 +649,16 @@ function savePayment(id){
   var cf = getConfirmById(cid);
   if(!cf){toast('确认单不存在');return;}
   var q = getQuoteById(cf.quoteId);
-  if(!q)return;
   var expected = q.lines.reduce((s,l)=>s+l.amount*l.count,0);
   var amount = parseFloat(document.getElementById('pm-amount').value)||0;
   if(Math.abs(amount-expected)>0.001){
-    toast(`金额与报价单不符，应为 $${expected.toFixed(2)}`);
+    toast(`金额不符，应为 $${expected.toFixed(2)}`);
     return;
   }
   var old=id?PAYMENTS.find(x=>x.id===id):null;
   var d={
     id:id||genId('pm'),
-    paymentId:old?old.paymentId:'PAY-'+String(PAYMENTS.length+1).padStart(4,'0'),
+    paymentId:old?old.paymentId:generatePaymentId(cf.accountName),
     confirmId:cid,
     amount:amount,
     paymentDate:document.getElementById('pm-date').value,
