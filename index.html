@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>土耳其KOL推广管理系统 v4</title>
+<title>土耳其KOL推广管理系统 v5</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -78,7 +78,7 @@ tr:hover td{background:var(--bg2)}
 .modal{background:var(--bg);border-radius:var(--radius-lg);padding:1.5rem;max-width:800px;width:95%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)}
 .modal h3{margin-bottom:1rem}
 
-.platform-row{display:flex;gap:8px;align-items:center;padding:8px;background:var(--bg2);border-radius:var(--radius);margin-bottom:6px;flex-wrap:wrap}
+.platform-row{display:flex;gap:8px;align-items:flex-end;padding:8px;background:var(--bg2);border-radius:var(--radius);margin-bottom:6px;flex-wrap:wrap}
 
 .autocomplete-wrap{position:relative}
 .autocomplete-list{position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);max-height:200px;overflow-y:auto;z-index:10;display:none}
@@ -90,7 +90,7 @@ tr:hover td{background:var(--bg2)}
 <div class="container">
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:16px;">
-  <div><h1 style="font-size:22px;font-weight:700;">🇹🇷 土耳其KOL推广管理 v4</h1></div>
+  <div><h1 style="font-size:22px;font-weight:700;">🇹🇷 土耳其KOL推广管理 v5</h1></div>
   <div style="display:flex;gap:8px;">
     <button class="btn btn-sm" onclick="exportAll()">📦 导出备份</button>
     <button class="btn btn-sm" onclick="document.getElementById('import-file').click()">📥 导入备份</button>
@@ -200,11 +200,11 @@ function saveKOL(id){
 // ==================== 2. 报价管理 ====================
 function generateQuoteId(accountName, lines){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
-  var platforms = [...new Set(lines.map(l=>l.platform))];
-  var platformStr = platforms.length===1 ? platforms[0] : 'Multi';
-  var prefix = `Q-TR-${accountName}-${platformStr}-${date}-`;
-  var count = QUOTES.filter(q=>q.quoteId.startsWith(prefix)).length + 1;
-  return prefix + String(count).padStart(2,'0');
+  var platforms=[...new Set(lines.map(l=>l.platform))];
+  var platformStr=platforms.length===1?platforms[0]:'Multi';
+  var prefix=`Q-TR-${accountName}-${platformStr}-${date}-`;
+  var count=QUOTES.filter(q=>q.quoteId.startsWith(prefix)).length+1;
+  return prefix+String(count).padStart(2,'0');
 }
 function renderQuote(){
   document.getElementById('page-quote').innerHTML=`
@@ -303,7 +303,7 @@ function saveQuote(id){
   save('QUOTES');renderQuoteTable();toast('报价单保存成功');document.getElementById('quote-modal')?.remove();
 }
 
-// ==================== 3. 确认单（签字后才联动报价单状态） ====================
+// ==================== 3. 确认单 ====================
 function generateConfirmId(accountName){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
   var prefix=`C-TR-${accountName}-${date}-`;
@@ -330,7 +330,6 @@ function deleteConfirm(id){
   if(!confirm('删除确认单将释放关联的报价单，确定吗？'))return;
   var c=CONFIRMS.find(x=>x.id===id);
   if(c){
-    // 释放报价单状态
     var q=getQuoteById(c.quoteId);
     if(q){q.confirmed=false;save('QUOTES');}
     CONFIRMS=CONFIRMS.filter(x=>x.id!==id);
@@ -370,29 +369,29 @@ function openConfirmForm(id){
   if(!isEdit){
     setupAutocomplete('cnf-kol','cnf-kol-list',KOLS.map(k=>k.accountName));
     var kolInput=document.getElementById('cnf-kol');
-    kolInput.addEventListener('input',function(){ updateQuoteSelectForAccount(this.value.trim()); });
-    kolInput.addEventListener('blur',function(){ setTimeout(()=>{ updateQuoteSelectForAccount(this.value.trim()); },200); });
-  }else{ setTimeout(()=>previewConfirm(),200); }
+    kolInput.addEventListener('input',function(){updateQuoteSelectForAccount(this.value.trim());});
+    kolInput.addEventListener('blur',function(){setTimeout(()=>{updateQuoteSelectForAccount(this.value.trim());},200);});
+  }else{setTimeout(()=>previewConfirm(),200);}
 }
 function updateQuoteSelectForAccount(account){
   var sel=document.getElementById('cnf-quote');
   if(!sel)return;
   var usedQuoteIds=CONFIRMS.map(c=>c.quoteId);
-  var available=QUOTES.filter(q=>q.accountName===account && !usedQuoteIds.includes(q.quoteId));
+  var available=QUOTES.filter(q=>q.accountName===account&&!usedQuoteIds.includes(q.quoteId));
   sel.innerHTML=available.length===0?'<option value="">无可用报价单</option>':
     available.map(q=>`<option value="${q.quoteId}">${q.quoteId} (${q.lines.map(l=>l.platform+'/'+l.contentType).join(', ')})</option>`).join('');
   previewConfirm();
 }
 function previewText(cf){
-  if(!cf)return '';
+  if(!cf)return'';
   var q=getQuoteById(cf.quoteId);
-  if(!q)return '报价单不存在';
+  if(!q)return'报价单不存在';
   return buildConfirmText(q,cf.deadline);
 }
 function buildConfirmText(q,deadline){
   var lines=q.lines.map(l=>`${l.platform}: ${l.count}${l.contentType}`).join('\n');
   var total=q.lines.reduce((s,l)=>s+l.amount*l.count,0);
-  return `Merhaba ${q.accountName},\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: ${[...new Set(q.lines.map(l=>l.platform))].join(', ')}\n- İçerik: ${lines}\n- Paylaşım Tarihi (DDL): ${deadline}\n- Ücret: $${total.toFixed(2)}\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.`;
+  return`Merhaba ${q.accountName},\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: ${[...new Set(q.lines.map(l=>l.platform))].join(', ')}\n- İçerik: ${lines}\n- Paylaşım Tarihi (DDL): ${deadline}\n- Ücret: $${total.toFixed(2)}\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.`;
 }
 function previewConfirm(){
   var sel=document.getElementById('cnf-quote');
@@ -439,8 +438,8 @@ function saveConfirm(id){
   var old=id?CONFIRMS.find(x=>x.id===id):null;
 
   function finish(sigData){
-    var wasSigned = old?old.signed:false;
-    var nowSigned = !!sigData;
+    var wasSigned=old?old.signed:false;
+    var nowSigned=!!sigData;
     var d={
       id:id||genId('cnf'),
       confirmId:old?old.confirmId:generateConfirmId(accountName),
@@ -452,35 +451,22 @@ function saveConfirm(id){
     };
     if(id){var i=CONFIRMS.findIndex(x=>x.id===id);if(i>-1)CONFIRMS[i]=d;}
     else{CONFIRMS.push(d);}
-
-    // 核心逻辑：报价单状态仅跟随签字状态
-    if(nowSigned && !wasSigned){
-      // 刚签字，确认报价单
-      q.confirmed=true;
-      toast('签字已上传，报价单自动确认');
-    } else if(!nowSigned && wasSigned){
-      // 清除了签字，取消报价单确认
-      q.confirmed=false;
-      toast('签字已清除，报价单取消确认');
-    }
-    // 如果本来就是未签字，保存也不影响报价单
+    if(nowSigned&&!wasSigned){q.confirmed=true;toast('签字已上传，报价单自动确认');}
+    else if(!nowSigned&&wasSigned){q.confirmed=false;toast('签字已清除，报价单取消确认');}
     save('QUOTES');
     save('CONFIRMS');
     renderConfirmTable();
     renderQuoteTable();
     document.getElementById('confirm-modal')?.remove();
   }
-
   if(sigFile){
     var reader=new FileReader();
     reader.onload=e=>finish(e.target.result);
     reader.readAsDataURL(sigFile);
-  }else{
-    finish(old?old.signature:'');
-  }
+  }else{finish(old?old.signature:'');}
 }
 
-// ==================== 4. 内容上传（严格匹配报价单） ====================
+// ==================== 4. 内容上传（只显示搜索框，查询后按需展示） ====================
 function generateContentId(accountName){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
   var prefix=`CT-TR-${accountName}-${date}-`;
@@ -492,7 +478,7 @@ function renderContent(){
     <div class="section">
       <div class="section-header"><span>📤 合作内容列表（${CONTENTS.length}条）</span><button class="btn btn-primary btn-sm" onclick="openContentForm()">+ 上传内容</button></div>
       <input type="text" id="content-search" placeholder="搜索内容ID..." style="width:280px;margin-bottom:1rem;" oninput="renderContentTable()">
-      <div class="table-wrap"><table><thead><tr><th>内容ID</th><th>确认单</th><th>主播</th><th>发布日期</th><th>文件</th><th>操作</th></tr></thead><tbody id="content-tbody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>内容ID</th><th>确认单</th><th>主播</th><th>已上传/需上传</th><th>文件</th><th>操作</th></tr></thead><tbody id="content-tbody"></tbody></table></div>
     </div>`;
   renderContentTable();
 }
@@ -503,21 +489,23 @@ function renderContentTable(){
   tb.innerHTML=list.length===0?'<tr><td colspan="6" class="empty">暂无内容</td></tr>':
     list.map(ct=>{
       var cf=getConfirmById(ct.confirmId);
-      var filesHtml=(ct.files||[]).map(f=>`<a href="${f.link}" target="_blank">${f.type}</a>`).join(', ');
-      return `<tr><td><strong>${ct.contentId}</strong></td><td>${ct.confirmId}</td><td>${cf?cf.accountName:'—'}</td><td>${ct.publishDate||'—'}</td><td>${filesHtml||'—'}</td><td><button class="action-btn" onclick="openContentForm('${ct.id}')">✏️</button><button class="action-btn del" onclick="if(confirm('删除？')){CONTENTS=CONTENTS.filter(x=>x.id!=='${ct.id}');save('CONTENTS');renderContentTable();}">✕</button></td></tr>`;
+      var q=cf?getQuoteById(cf.quoteId):null;
+      var totalRequired=q?q.lines.reduce((s,l)=>s+l.count,0):0;
+      var uploaded=ct.files?ct.files.length:0;
+      var filesHtml=(ct.files||[]).map(f=>`<a href="${f.link}" target="_blank">${f.type}</a> (${f.date||'—'})`).join(', ');
+      return `<tr><td><strong>${ct.contentId}</strong></td><td>${ct.confirmId}</td><td>${cf?cf.accountName:'—'}</td><td>${uploaded}/${totalRequired}</td><td>${filesHtml||'—'}</td><td><button class="action-btn" onclick="openContentForm('${ct.id}')">✏️</button><button class="action-btn del" onclick="if(confirm('删除？')){CONTENTS=CONTENTS.filter(x=>x.id!=='${ct.id}');save('CONTENTS');renderContentTable();}">✕</button></td></tr>`;
     }).join('');
 }
 function openContentForm(id){
   var ct=id?CONTENTS.find(x=>x.id===id):null;
   var h=`<div class="modal-overlay" id="content-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>${ct?'编辑':'上传'}合作内容</h3>
     <div class="form-grid">
-      <div class="form-group"><label>确认单ID *</label><input id="cnt-search" value="${ct?ct.confirmId:''}" placeholder="输入确认单ID查询" ${ct?'readonly':''}></div>
-      <div class="form-group"><label>发布日期</label><input type="date" id="cnt-publish-date" value="${ct?ct.publishDate:new Date().toISOString().slice(0,10)}"></div>
+      <div class="form-group"><label>确认单ID *</label><input id="cnt-search" value="${ct?ct.confirmId:''}" placeholder="输入确认单ID" ${ct?'readonly':''}></div>
     </div>
     <button class="btn btn-sm" onclick="searchConfirmForContent()">🔍 查询确认单</button>
     <div id="cnt-info" style="margin:1rem 0; padding:1rem; background:var(--bg2); border-radius:var(--radius); display:none;"></div>
     <div id="cnt-upload-section" style="display:none; margin-top:1rem;">
-      <strong>上传文件（必须与报价单一致）</strong>
+      <strong>按需上传内容（根据报价单明细，每条可独立设置日期）</strong>
       <div id="cnt-files"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:1rem;">
@@ -528,67 +516,76 @@ function openContentForm(id){
   if(ct) searchConfirmForContent(ct.confirmId);
 }
 function searchConfirmForContent(forceCid){
-  var cid = forceCid || document.getElementById('cnt-search').value.trim();
+  var cid=forceCid||document.getElementById('cnt-search').value.trim();
   if(!cid){toast('请输入确认单ID');return;}
-  var cf = getConfirmById(cid);
+  var cf=getConfirmById(cid);
   if(!cf){toast('确认单不存在');return;}
   if(!cf.signed){toast('确认单尚未签字，无法上传内容');return;}
-  var q = getQuoteById(cf.quoteId);
+  var q=getQuoteById(cf.quoteId);
   if(!q){toast('报价单丢失');return;}
   // 显示信息
-  var infoDiv = document.getElementById('cnt-info');
+  var infoDiv=document.getElementById('cnt-info');
   infoDiv.style.display='block';
-  infoDiv.innerHTML = `<strong>确认单：${cid}</strong> | 主播：${cf.accountName} | DDL：${cf.deadline}`;
+  infoDiv.innerHTML=`<strong>确认单：${cid}</strong> | 主播：${cf.accountName} | DDL：${cf.deadline}`;
+  // 查找已有内容记录
+  var existingContent=CONTENTS.find(c=>c.confirmId===cid);
+  var existingFiles=existingContent?existingContent.files:[];
   // 构建上传区域：根据报价单明细逐条生成
-  var uploadSection = document.getElementById('cnt-upload-section');
+  var uploadSection=document.getElementById('cnt-upload-section');
   uploadSection.style.display='block';
-  var filesDiv = document.getElementById('cnt-files');
-  filesDiv.innerHTML = '';
+  var filesDiv=document.getElementById('cnt-files');
+  filesDiv.innerHTML='';
   q.lines.forEach((l,idx)=>{
-    for(var j=0; j<l.count; j++){
-      var reqId = `req-${idx}-${j}`;
-      var row = document.createElement('div');
-      row.className = 'platform-row';
-      row.innerHTML = `
-        <div class="form-group"><label>${l.platform} ${l.contentType} #${j+1}</label><input id="cnt-link-${reqId}" placeholder="输入发布链接" style="width:250px;"></div>
-        <div class="form-group"><label>日期</label><input type="date" id="cnt-date-${reqId}" value="${document.getElementById('cnt-publish-date')?.value || ''}"></div>`;
+    for(var j=0;j<l.count;j++){
+      var reqId=`req-${idx}-${j}`;
+      // 查找是否已上传对应内容
+      var existingFile=existingFiles.find(f=>f.reqId===reqId);
+      var row=document.createElement('div');
+      row.className='platform-row';
+      row.innerHTML=`
+        <div class="form-group"><label>${l.platform} ${l.contentType} #${j+1}</label><input id="cnt-link-${reqId}" placeholder="发布链接" value="${existingFile?existingFile.link:''}" style="width:250px;"></div>
+        <div class="form-group"><label>发布日期</label><input type="date" id="cnt-date-${reqId}" value="${existingFile?existingFile.date:''}"></div>`;
       filesDiv.appendChild(row);
     }
   });
   document.getElementById('cnt-save-btn').style.display='inline-flex';
 }
 function saveContent(id){
-  var cid = document.getElementById('cnt-search').value.trim();
+  var cid=document.getElementById('cnt-search').value.trim();
   if(!cid){toast('确认单ID不能为空');return;}
-  var cf = getConfirmById(cid);
-  var q = getQuoteById(cf.quoteId);
-  // 收集所有必填链接
+  var cf=getConfirmById(cid);
+  var q=getQuoteById(cf.quoteId);
+  // 收集所有已填写的文件（按需，不强制全填）
   var files=[];
-  var allInputs = document.querySelectorAll('#cnt-files .platform-row');
-  var miss=false;
-  allInputs.forEach(row=>{
-    var link = row.querySelector('input[type="text"]')?.value.trim();
-    var date = row.querySelector('input[type="date"]')?.value;
-    var label = row.querySelector('label')?.textContent;
-    if(!link){ miss=true; toast(`请填写 ${label} 的链接`); }
-    files.push({type:label, link:link, date:date});
+  var allRows=document.querySelectorAll('#cnt-files .platform-row');
+  var hasAny=false;
+  allRows.forEach(row=>{
+    var link=row.querySelector('input[type="text"]')?.value.trim();
+    var date=row.querySelector('input[type="date"]')?.value;
+    var label=row.querySelector('label')?.textContent;
+    // 获取reqId
+    var linkInput=row.querySelector('input[type="text"]');
+    var reqId=linkInput?linkInput.id.replace('cnt-link-',''):'';
+    if(link){
+      hasAny=true;
+      files.push({reqId:reqId,type:label,link:link,date:date||''});
+    }
   });
-  if(miss) return;
+  if(!hasAny){toast('请至少上传一条内容');return;}
   var ct=id?CONTENTS.find(x=>x.id===id):null;
   var d={
     id:id||genId('cnt'),
     contentId:ct?ct.contentId:generateContentId(cf.accountName),
     confirmId:cid,
-    publishDate:document.getElementById('cnt-publish-date').value,
-    files,
+    files:files,
     uploadDate:new Date().toISOString().slice(0,10)
   };
   if(id){var i=CONTENTS.findIndex(x=>x.id===id);if(i>-1)CONTENTS[i]=d;}
   else{CONTENTS.push(d);}
-  save('CONTENTS');renderContentTable();toast('内容保存成功');document.getElementById('content-modal')?.remove();
+  save('CONTENTS');renderContentTable();toast('内容保存成功（'+files.length+'条）');document.getElementById('content-modal')?.remove();
 }
 
-// ==================== 5. 付款（搜索确认单ID，自动金额，ID优化） ====================
+// ==================== 5. 付款 ====================
 function generatePaymentId(accountName){
   var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
   var prefix=`P-TR-${accountName}-${date}-`;
@@ -631,30 +628,27 @@ function openPaymentForm(id){
   if(p) searchConfirmForPayment(p.confirmId);
 }
 function searchConfirmForPayment(forceCid){
-  var cid = forceCid || document.getElementById('pm-search').value.trim();
+  var cid=forceCid||document.getElementById('pm-search').value.trim();
   if(!cid){toast('请输入确认单ID');return;}
-  var cf = getConfirmById(cid);
+  var cf=getConfirmById(cid);
   if(!cf){toast('确认单不存在');return;}
-  var q = getQuoteById(cf.quoteId);
+  var q=getQuoteById(cf.quoteId);
   if(!q)return;
-  var total = q.lines.reduce((s,l)=>s+l.amount*l.count,0);
-  document.getElementById('pm-amount').value = total.toFixed(2);
-  var infoDiv = document.getElementById('pm-info');
+  var total=q.lines.reduce((s,l)=>s+l.amount*l.count,0);
+  document.getElementById('pm-amount').value=total.toFixed(2);
+  var infoDiv=document.getElementById('pm-info');
   infoDiv.style.display='block';
-  infoDiv.innerHTML = `确认单：${cid} | 主播：${cf.accountName} | 应付：$${total.toFixed(2)}`;
+  infoDiv.innerHTML=`确认单：${cid} | 主播：${cf.accountName} | 应付：$${total.toFixed(2)}`;
 }
 function savePayment(id){
-  var cid = document.getElementById('pm-search').value.trim();
+  var cid=document.getElementById('pm-search').value.trim();
   if(!cid){toast('确认单ID不能为空');return;}
-  var cf = getConfirmById(cid);
+  var cf=getConfirmById(cid);
   if(!cf){toast('确认单不存在');return;}
-  var q = getQuoteById(cf.quoteId);
-  var expected = q.lines.reduce((s,l)=>s+l.amount*l.count,0);
-  var amount = parseFloat(document.getElementById('pm-amount').value)||0;
-  if(Math.abs(amount-expected)>0.001){
-    toast(`金额不符，应为 $${expected.toFixed(2)}`);
-    return;
-  }
+  var q=getQuoteById(cf.quoteId);
+  var expected=q.lines.reduce((s,l)=>s+l.amount*l.count,0);
+  var amount=parseFloat(document.getElementById('pm-amount').value)||0;
+  if(Math.abs(amount-expected)>0.001){toast(`金额不符，应为 $${expected.toFixed(2)}`);return;}
   var old=id?PAYMENTS.find(x=>x.id===id):null;
   var d={
     id:id||genId('pm'),
