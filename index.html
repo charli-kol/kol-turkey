@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>土耳其KOL推广管理系统</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--bg2:#f8f9fa;--bg3:#f1f3f5;--text:#212529;--text2:#6c757d;
+  --border:rgba(0,0,0,.06);--border2:rgba(0,0,0,.12);--radius:8px;--radius-lg:14px;
+  --primary:#3b82f6;--primary-light:rgba(59,130,246,.08);--shadow:0 1px 3px rgba(0,0,0,.04);
+  --tr-color:#0ca678;--green:#2b8a3e;--red:#c92a2a;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#1a1b1e;--bg2:#25262b;--bg3:#101113;--text:#c1c2c5;--text2:#909296;--border:rgba(255,255,255,.05);--border2:rgba(255,255,255,.12);--primary-light:rgba(59,130,246,.12);--shadow:0 1px 3px rgba(0,0,0,.2);}
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
+.container{max-width:1400px;margin:0 auto;padding:1.5rem 1rem}
+
+select,input[type="text"],input[type="number"],input[type="date"],input[type="url"],input[type="email"],input[type="tel"],textarea{
+  appearance:none;-webkit-appearance:none;
+  padding:9px 14px;border:1.5px solid var(--border);border-radius:var(--radius);
+  background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;
+  transition:all .2s;box-shadow:var(--shadow);width:100%;
+}
+select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;
+}
+textarea{resize:vertical;min-height:60px;background-image:none;}
+select:hover,input:hover,textarea:hover{border-color:var(--primary)}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:9px 18px;
+  border-radius:var(--radius);border:1.5px solid var(--border2);background:var(--bg);
+  color:var(--text);cursor:pointer;font-size:13px;font-weight:500;font-family:inherit;
+  transition:all .2s;box-shadow:var(--shadow);white-space:nowrap;
+}
+.btn:hover{background:var(--bg2);border-color:var(--primary);}
+.btn-primary{background:var(--primary);color:#fff;border-color:var(--primary);}
+.btn-primary:hover{background:#2563eb;}
+.btn-tr{background:var(--tr-color);color:#fff;border-color:var(--tr-color);}
+.btn-tr:hover{background:#099268;}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red);}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-xs{padding:3px 10px;font-size:11px;}
+
+.tabs{display:flex;gap:4px;background:var(--bg2);border-radius:var(--radius);padding:5px;margin-bottom:1.5rem;flex-wrap:wrap}
+.tab{padding:8px 18px;border-radius:7px;border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--text2);font-family:inherit;transition:all .2s;white-space:nowrap}
+.tab.active{background:var(--bg);color:var(--tr-color);font-weight:600;box-shadow:var(--shadow)}
+
+.section{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.section-header{font-size:14px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:var(--text2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--bg2)}
+td{padding:10px 12px;border-bottom:1px solid var(--border)}
+tr:hover td{background:var(--bg2)}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem}
+
+.badge{display:inline-block;padding:3px 10px;border-radius:14px;font-size:11px;font-weight:600}
+.b-yes{background:#d3f9d8;color:#0ca678}.b-no{background:#ffe3e3;color:#c92a2a}
+.b-pending{background:#fff9db;color:#fab005}.b-signed{background:#d3f9d8;color:#0ca678}
+.b-paid{background:#d3f9d8;color:#0ca678}.b-unpaid{background:#ffe3e3;color:#c92a2a}
+
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1rem}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.form-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}
+
+.toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#212529;color:#fff;padding:12px 24px;border-radius:var(--radius);font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;}
+.toast.show{opacity:1}
+
+.action-btn{background:none;border:none;cursor:pointer;color:var(--text2);font-size:14px;padding:4px 8px;border-radius:6px;transition:all .15s}
+.action-btn:hover{color:var(--primary);background:var(--primary-light)}
+.action-btn.del:hover{color:#c92a2a;background:rgba(201,42,42,.1)}
+
+.empty{text-align:center;padding:3rem;color:var(--text2)}
+
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9998;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--bg);border-radius:var(--radius-lg);padding:1.5rem;max-width:800px;width:95%;max-height:90vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.modal h3{margin-bottom:1rem}
+
+.platform-row{display:flex;gap:8px;align-items:center;padding:8px;background:var(--bg2);border-radius:var(--radius);margin-bottom:6px;flex-wrap:wrap}
+
+.signature-box{border:2px dashed var(--border);border-radius:var(--radius);padding:20px;text-align:center;margin:1rem 0;cursor:pointer;background:var(--bg2)}
+.signature-box canvas{max-width:100%;border:1px solid var(--border);border-radius:var(--radius)}
+</style>
+</head>
+<body>
+<div class="container">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:16px;">
+  <div><h1 style="font-size:22px;font-weight:700;">🇹🇷 土耳其KOL推广管理</h1></div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-sm" onclick="exportAll()">📦 导出备份</button>
+    <button class="btn btn-sm" onclick="document.getElementById('import-file').click()">📥 导入备份</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importAll(event)">
+  </div>
+</div>
+
+<div class="tabs" id="main-tabs">
+  <button class="tab active" data-tab="kol">📇 1. 主播录入</button>
+  <button class="tab" data-tab="quote">💰 2. 报价管理</button>
+  <button class="tab" data-tab="confirm">📝 3. 合同/确认单</button>
+  <button class="tab" data-tab="content">📤 4. 内容上传</button>
+  <button class="tab" data-tab="payment">💳 5. 付款</button>
+</div>
+
+<div id="page-kol" class="page"></div>
+<div id="page-quote" class="page" style="display:none;"></div>
+<div id="page-confirm" class="page" style="display:none;"></div>
+<div id="page-content" class="page" style="display:none;"></div>
+<div id="page-payment" class="page" style="display:none;"></div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ 数据层 ============
+var KOLS=[],QUOTES=[],CONFIRMS=[],CONTENTS=[],PAYMENTS=[];
+var PLATFORMS=['TikTok','YouTube','Instagram'];
+var CONTENT_TYPES={TikTok:['video','comment'],YouTube:['shorts','comment'],Instagram:['reel','story','post']};
+
+function load(){
+  ['KOLS','QUOTES','CONFIRMS','CONTENTS','PAYMENTS'].forEach(function(k){
+    try{var d=JSON.parse(localStorage.getItem('tr_'+k)||'[]');window[k]=d;}catch(e){window[k]=[];}
+  });
+}
+function save(k){localStorage.setItem('tr_'+k,JSON.stringify(window[k]));}
+function saveAll(){['KOLS','QUOTES','CONFIRMS','CONTENTS','PAYMENTS'].forEach(function(k){save(k);});}
+function toast(m){var e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(window._tt);window._tt=setTimeout(function(){e.classList.remove('show');},2500);}
+function genId(p){return p+'_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);}
+function getKol(id){return KOLS.find(function(k){return k.id===id;});}
+function getQuote(id){return QUOTES.find(function(q){return q.id===id;});}
+function getConfirm(id){return CONFIRMS.find(function(c){return c.id===id;});}
+
+load();
+
+// ============ 页面切换 ============
+document.getElementById('main-tabs').addEventListener('click',function(e){
+  var t=e.target.closest('.tab');if(!t)return;
+  document.querySelectorAll('#main-tabs .tab').forEach(function(b){b.classList.remove('active');});
+  t.classList.add('active');
+  document.querySelectorAll('.page').forEach(function(p){p.style.display='none';});
+  var page=t.dataset.tab;
+  document.getElementById('page-'+page).style.display='block';
+  if(page==='kol')renderKOL();
+  if(page==='quote')renderQuote();
+  if(page==='confirm')renderConfirm();
+  if(page==='content')renderContent();
+  if(page==='payment')renderPayment();
+});
+
+// ============ 1. 主播录入 ============
+function renderKOL(){
+  var c=document.getElementById('page-kol');
+  c.innerHTML='<div class="section"><div class="section-header"><span>📇 主播列表（'+KOLS.length+'人）</span><button class="btn btn-primary btn-sm" onclick="openKOLForm()">+ 新增主播</button></div><div class="table-wrap"><table><thead><tr><th>KOL ID</th><th>平台</th><th>主页链接</th><th>粉丝数</th><th>Email</th><th>手机号</th><th>近30天视频数</th><th>操作</th></tr></thead><tbody id="kol-tbody"></tbody></table></div></div>';
+  renderKOLTable();
+}
+function renderKOLTable(){
+  var tb=document.getElementById('kol-tbody');
+  tb.innerHTML=KOLS.length===0?'<tr><td colspan="8" class="empty">暂无主播</td></tr>':
+    KOLS.map(function(k){
+      return'<tr><td><strong>'+k.kolId+'</strong></td><td>'+k.platform+'</td><td>'+(k.profileUrl?'<a href="'+k.profileUrl+'" target="_blank" style="color:var(--primary);">🔗 查看</a>':'—')+'</td><td>'+(k.followers||0).toLocaleString()+'</td><td>'+k.email+'</td><td>'+k.phone+'</td><td>'+(k.recentVideos||0)+'</td><td><button class="action-btn" onclick="openKOLForm(\''+k.id+'\')">✏️</button><button class="action-btn del" onclick="if(confirm(\'删除？\')){KOLS=KOLS.filter(function(x){return x.id!==\''+k.id+'\'});save(\'KOLS\');renderKOLTable();}">✕</button></td></tr>';
+    }).join('');
+}
+function openKOLForm(id){
+  var k=id?KOLS.find(function(x){return x.id===id;}):null;
+  var h='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>'+(k?'编辑':'新增')+'主播</h3>'+
+    '<div class="form-grid"><div class="form-group"><label>KOL ID *</label><input id="kf-id" value="'+(k?k.kolId:'')+'" placeholder="如 KOL-001"></div>'+
+    '<div class="form-group"><label>平台 *</label><select id="kf-platform">'+PLATFORMS.map(function(p){return'<option value="'+p+'"'+(k&&k.platform===p?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div>'+
+    '<div class="form-group"><label>主页链接</label><input type="url" id="kf-url" value="'+(k?k.profileUrl:'')+'"></div>'+
+    '<div class="form-group"><label>粉丝数</label><input type="number" id="kf-followers" value="'+(k?k.followers:'')+'"></div>'+
+    '<div class="form-group"><label>Email</label><input type="email" id="kf-email" value="'+(k?k.email:'')+'"></div>'+
+    '<div class="form-group"><label>手机号</label><input type="tel" id="kf-phone" value="'+(k?k.phone:'')+'"></div>'+
+    '<div class="form-group"><label>近30天视频数</label><input type="number" id="kf-videos" value="'+(k?k.recentVideos:'')+'"></div></div>'+
+    '<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="saveKOL(\''+(k?k.id:'')+'\')">保存</button><button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function saveKOL(id){
+  var d={
+    id:id||genId('kol'),
+    kolId:document.getElementById('kf-id').value.trim(),
+    platform:document.getElementById('kf-platform').value,
+    profileUrl:document.getElementById('kf-url').value.trim(),
+    followers:parseInt(document.getElementById('kf-followers').value)||0,
+    email:document.getElementById('kf-email').value.trim(),
+    phone:document.getElementById('kf-phone').value.trim(),
+    recentVideos:parseInt(document.getElementById('kf-videos').value)||0
+  };
+  if(!d.kolId){toast('请填写KOL ID');return;}
+  if(id){var i=KOLS.findIndex(function(x){return x.id===id;});if(i>-1)KOLS[i]=d;}
+  else{KOLS.push(d);}
+  save('KOLS');renderKOLTable();toast('保存成功');document.querySelector('.modal-overlay')?.remove();
+}
+
+// ============ 2. 报价管理 ============
+function renderQuote(){
+  var c=document.getElementById('page-quote');
+  c.innerHTML='<div class="section"><div class="section-header"><span>💰 报价单列表（'+QUOTES.length+'份）</span><button class="btn btn-primary btn-sm" onclick="openQuoteForm()">+ 新建报价单</button></div><div class="table-wrap"><table><thead><tr><th>报价单ID</th><th>KOL ID</th><th>报价平台</th><th>合作形式</th><th>金额($)</th><th>备注</th><th>状态</th><th>操作</th></tr></thead><tbody id="quote-tbody"></tbody></table></div></div>';
+  renderQuoteTable();
+}
+function renderQuoteTable(){
+  var tb=document.getElementById('quote-tbody');
+  tb.innerHTML=QUOTES.length===0?'<tr><td colspan="8" class="empty">暂无报价单</td></tr>':
+    QUOTES.map(function(q){
+      var lines=q.lines||[];
+      var summary=lines.map(function(l){return l.platform+'/'+l.contentType;}).join(', ');
+      var total=lines.reduce(function(s,l){return s+(l.amount||0);},0);
+      return'<tr><td><strong>'+q.quoteId+'</strong></td><td>'+q.kolId+'</td><td>'+summary+'</td><td>—</td><td>$'+total.toFixed(2)+'</td><td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(q.note||'')+'</td><td><span class="badge '+(q.confirmed?'b-yes':'b-pending')+'">'+(q.confirmed?'已确认':'待确认')+'</span></td><td><button class="action-btn" onclick="openQuoteForm(\''+q.id+'\')">✏️</button><button class="action-btn del" onclick="if(confirm(\'删除？\')){QUOTES=QUOTES.filter(function(x){return x.id!==\''+q.id+'\'});save(\'QUOTES\');renderQuoteTable();}">✕</button></td></tr>';
+    }).join('');
+}
+function openQuoteForm(id){
+  var q=id?QUOTES.find(function(x){return x.id===id;}):null;
+  var lines=q?q.lines:[];
+  var kolOptions=KOLS.map(function(k){return'<option value="'+k.kolId+'"'+(q&&q.kolId===k.kolId?' selected':'')+'>'+k.kolId+' ('+k.platform+' '+k.followers.toLocaleString()+')</option>';}).join('');
+  if(!kolOptions)kolOptions='<option value="">-- 请先录入主播 --</option>';
+  var h='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal" style="max-width:850px;"><h3>'+(q?'编辑':'新建')+'报价单</h3>'+
+    '<div class="form-grid"><div class="form-group"><label>KOL ID *</label><select id="qf-kol">'+kolOptions+'</select></div>'+
+    '<div class="form-group"><label>备注</label><input id="qf-note" value="'+(q?q.note:'')+'" placeholder="合作备注"></div></div>'+
+    '<div style="margin:1rem 0;"><strong style="font-size:13px;">报价明细（可添加多平台）</strong></div>'+
+    '<div id="qf-lines">'+(lines.length===0?addQuoteLine():lines.map(function(l,i){return buildQuoteLine(l,i);}).join(''))+'</div>'+
+    '<button class="btn btn-sm" style="margin-bottom:1rem;" onclick="addQuoteLine()">+ 添加平台</button>'+
+    '<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="saveQuote(\''+(q?q.id:'')+'\')">保存报价单</button><button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+  // 绑定平台变化事件
+  document.querySelectorAll('#qf-lines select[id^="ql-platform-"]').forEach(function(sel){
+    sel.addEventListener('change',function(){updateLineTypes(this);});
+  });
+}
+function buildQuoteLine(l,i){
+  var types=CONTENT_TYPES[l.platform||'TikTok']||['video'];
+  return'<div class="platform-row" id="ql-row-'+i+'"><div class="form-group"><label>平台</label><select id="ql-platform-'+i+'" onchange="updateLineTypes(this)" style="width:120px;">'+PLATFORMS.map(function(p){return'<option value="'+p+'"'+(l.platform===p?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div><div class="form-group"><label>合作形式</label><select id="ql-type-'+i+'" style="width:130px;">'+types.map(function(t){return'<option value="'+t+'"'+(l.contentType===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div><div class="form-group"><label>金额($)</label><input type="number" id="ql-amount-'+i+'" step="0.01" value="'+(l.amount||'')+'" style="width:100px;"></div><button class="action-btn del" onclick="document.getElementById(\'ql-row-'+i+'\').remove()">✕</button></div>';
+}
+function addQuoteLine(){
+  var i=document.querySelectorAll('#qf-lines .platform-row').length;
+  var div=document.createElement('div');div.innerHTML=buildQuoteLine({},i);
+  document.getElementById('qf-lines').appendChild(div.firstElementChild);
+  var sel=document.getElementById('ql-platform-'+i);
+  if(sel)sel.addEventListener('change',function(){updateLineTypes(this);});
+}
+function updateLineTypes(sel){
+  var p=sel.value,row=sel.closest('.platform-row');
+  var typeSel=row.querySelector('select[id^="ql-type-"]');
+  var types=CONTENT_TYPES[p]||['video'];
+  typeSel.innerHTML=types.map(function(t){return'<option value="'+t+'">'+t+'</option>';}).join('');
+}
+function saveQuote(id){
+  var kolId=document.getElementById('qf-kol').value;
+  if(!kolId){toast('请选择KOL');return;}
+  var lines=[];
+  document.querySelectorAll('#qf-lines .platform-row').forEach(function(row){
+    var p=row.querySelector('select[id^="ql-platform-"]')?.value;
+    var t=row.querySelector('select[id^="ql-type-"]')?.value;
+    var a=parseFloat(row.querySelector('input[id^="ql-amount-"]')?.value)||0;
+    if(p&&t)lines.push({platform:p,contentType:t,amount:a});
+  });
+  if(lines.length===0){toast('请至少添加一条报价明细');return;}
+  var d={
+    id:id||genId('qt'),
+    quoteId:'QT-'+String(QUOTES.length+1).padStart(4,'0'),
+    kolId:kolId,
+    lines:lines,
+    note:document.getElementById('qf-note').value.trim(),
+    confirmed:q?q.confirmed:false,
+    createdAt:new Date().toISOString().slice(0,10)
+  };
+  if(id){var i=QUOTES.findIndex(function(x){return x.id===id;});if(i>-1){d.quoteId=QUOTES[i].quoteId;d.confirmed=QUOTES[i].confirmed;QUOTES[i]=d;}}
+  else{QUOTES.push(d);}
+  save('QUOTES');renderQuoteTable();toast('报价单保存成功');document.querySelector('.modal-overlay')?.remove();
+}
+
+// ============ 3. 合同/确认单 ============
+function renderConfirm(){
+  var c=document.getElementById('page-confirm');
+  c.innerHTML='<div class="section"><div class="section-header"><span>📝 确认单列表（'+CONFIRMS.length+'份）</span><button class="btn btn-primary btn-sm" onclick="openConfirmForm()">+ 生成确认单</button></div><div class="table-wrap"><table><thead><tr><th>确认单ID</th><th>关联报价单</th><th>KOL</th><th>内容摘要</th><th>金额</th><th>发布日期</th><th>签字状态</th><th>操作</th></tr></thead><tbody id="confirm-tbody"></tbody></table></div></div>';
+  renderConfirmTable();
+}
+function renderConfirmTable(){
+  var tb=document.getElementById('confirm-tbody');
+  tb.innerHTML=CONFIRMS.length===0?'<tr><td colspan="8" class="empty">暂无确认单</td></tr>':
+    CONFIRMS.map(function(c){
+      var q=getQuote(c.quoteId);
+      var summary=(q?q.lines.map(function(l){return l.platform+'/'+l.contentType;}).join(', '):'—');
+      var total=q?q.lines.reduce(function(s,l){return s+l.amount;},0):0;
+      return'<tr><td><strong>'+c.confirmId+'</strong></td><td>'+c.quoteId+'</td><td>'+c.kolId+'</td><td>'+summary+'</td><td>$'+total.toFixed(2)+'</td><td>'+c.publishDate+'</td><td><span class="badge '+(c.signed?'b-signed':'b-pending')+'">'+(c.signed?'已签字':'待签字')+'</span></td><td><button class="action-btn" onclick="viewConfirm(\''+c.id+'\')">👁️</button><button class="action-btn" onclick="openConfirmForm(\''+c.id+'\')">✏️</button><button class="action-btn del" onclick="if(confirm(\'删除？\')){CONFIRMS=CONFIRMS.filter(function(x){return x.id!==\''+c.id+'\'});save(\'CONFIRMS\');renderConfirmTable();}">✕</button></td></tr>';
+    }).join('');
+}
+function openConfirmForm(id){
+  var cf=id?CONFIRMS.find(function(x){return x.id===id;}):null;
+  var quoteOptions=QUOTES.map(function(q){
+    return'<option value="'+q.quoteId+'"'+(cf&&cf.quoteId===q.quoteId?' selected':'')+'>'+q.quoteId+' - '+q.kolId+'</option>';
+  }).join('');
+  if(!quoteOptions)quoteOptions='<option value="">-- 请先创建报价单 --</option>';
+  // 计算默认发布日期（当前+60天）
+  var defaultDate=new Date();defaultDate.setDate(defaultDate.getDate()+60);
+  var defaultDateStr=defaultDate.toISOString().slice(0,10);
+  var h='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>'+(cf?'编辑':'生成')+'确认单</h3>'+
+    '<div class="form-grid"><div class="form-group"><label>关联报价单 *</label><select id="cnf-quote" onchange="previewConfirm()">'+quoteOptions+'</select></div>'+
+    '<div class="form-group"><label>发布日期</label><input type="date" id="cnf-date" value="'+(cf?cf.publishDate:defaultDateStr)+'" onchange="previewConfirm()"></div>'+
+    '<div class="form-group"><label>KOL Email</label><input type="email" id="cnf-email" value="'+(cf?cf.email:'')+'" placeholder="自动从主播信息获取"></div></div>'+
+    '<div class="section" style="background:var(--bg2);margin-top:1rem;"><div class="section-header">📧 确认单预览（土耳其语）</div><div id="cnf-preview" style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg);border-radius:var(--radius);">请先选择报价单...</div></div>'+
+    (cf&&cf.signed?'<div class="section" style="background:#d3f9d8;margin-top:1rem;"><div class="section-header">✅ 签字已完成</div><img src="'+cf.signature+'" style="max-width:300px;border:1px solid var(--border);border-radius:var(--radius);"></div>':
+    '<div class="signature-box" id="sig-box"><p style="margin-bottom:8px;">✍️ KOL电子签字区（点击签名）</p><canvas id="sig-canvas" width="400" height="150" style="width:100%;max-width:400px;"></canvas><button class="btn btn-sm" style="margin-top:8px;" onclick="clearSignature()">清除重签</button></div>')+
+    '<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="saveConfirm(\''+(cf?cf.id:'')+'\')">保存确认单</button><button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+  setTimeout(function(){
+    previewConfirm();
+    if(!cf||!cf.signed)initSignature();
+  },200);
+}
+function previewConfirm(){
+  var quoteId=document.getElementById('cnf-quote')?.value;
+  var date=document.getElementById('cnf-date')?.value||'';
+  var q=getQuote(quoteId);
+  if(!q){document.getElementById('cnf-preview').textContent='请选择报价单...';return;}
+  var kol=getKol(q.kolId);
+  var lines=q.lines.map(function(l){return l.platform+' - '+l.contentType;}).join('\n');
+  var total=q.lines.reduce(function(s,l){return s+l.amount;},0);
+  var preview='Merhaba '+q.kolId+',\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: '+(q.lines.map(function(l){return l.platform;}).join(', '))+'\n- İçerik: '+lines+'\n- Paylaşım Tarihi: '+date+'\n- Ücret: $'+total.toFixed(2)+'\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code\'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.';
+  document.getElementById('cnf-preview').textContent=preview;
+  // 自动获取KOL邮箱
+  if(kol&&kol.email)document.getElementById('cnf-email').value=kol.email;
+}
+function initSignature(){
+  var canvas=document.getElementById('sig-canvas');if(!canvas)return;
+  var ctx=canvas.getContext('2d');ctx.fillStyle='#f8f9fa';ctx.fillRect(0,0,400,150);
+  var drawing=false;
+  canvas.onmousedown=function(e){drawing=true;ctx.beginPath();ctx.moveTo(e.offsetX,e.offsetY);};
+  canvas.onmousemove=function(e){if(!drawing)return;ctx.lineWidth=2;ctx.strokeStyle='#212529';ctx.lineTo(e.offsetX,e.offsetY);ctx.stroke();};
+  canvas.onmouseup=function(){drawing=false;};
+  canvas.onmouseleave=function(){drawing=false;};
+  canvas.ontouchstart=function(e){e.preventDefault();drawing=true;var t=e.touches[0];var r=canvas.getBoundingClientRect();ctx.beginPath();ctx.moveTo(t.clientX-r.left,t.clientY-r.top);};
+  canvas.ontouchmove=function(e){e.preventDefault();if(!drawing)return;var t=e.touches[0];var r=canvas.getBoundingClientRect();ctx.lineWidth=2;ctx.strokeStyle='#212529';ctx.lineTo(t.clientX-r.left,t.clientY-r.top);ctx.stroke();};
+  canvas.ontouchend=function(){drawing=false;};
+}
+function clearSignature(){
+  var canvas=document.getElementById('sig-canvas');if(!canvas)return;
+  var ctx=canvas.getContext('2d');ctx.fillStyle='#f8f9fa';ctx.fillRect(0,0,400,150);
+}
+function saveConfirm(id){
+  var quoteId=document.getElementById('cnf-quote').value;
+  if(!quoteId){toast('请选择报价单');return;}
+  var q=getQuote(quoteId);
+  var canvas=document.getElementById('sig-canvas');
+  var sigData=canvas?canvas.toDataURL():'';
+  var hasSig=false;
+  if(canvas){var ctx=canvas.getContext('2d');var imgData=ctx.getImageData(0,0,400,150);for(var i=0;i<imgData.data.length;i+=4){if(imgData.data[i+3]>0){hasSig=true;break;}}}
+  var cf=id?CONFIRMS.find(function(x){return x.id===id;}):null;
+  var d={
+    id:id||genId('cnf'),
+    confirmId:cf?cf.confirmId:'CNF-'+String(CONFIRMS.length+1).padStart(4,'0'),
+    quoteId:quoteId,
+    kolId:q?q.kolId:'',
+    email:document.getElementById('cnf-email').value.trim(),
+    publishDate:document.getElementById('cnf-date').value,
+    signed:hasSig||(cf&&cf.signed),
+    signature:hasSig?sigData:(cf?cf.signature:'')
+  };
+  if(id){var i=CONFIRMS.findIndex(function(x){return x.id===id;});if(i>-1)CONFIRMS[i]=d;}
+  else{CONFIRMS.push(d);}
+  // 标记报价单为已确认
+  if(d.signed){var qi=QUOTES.findIndex(function(x){return x.quoteId===quoteId;});if(qi>-1)QUOTES[qi].confirmed=true;save('QUOTES');}
+  save('CONFIRMS');renderConfirmTable();toast('确认单保存成功');document.querySelector('.modal-overlay')?.remove();
+}
+function viewConfirm(id){
+  var c=getConfirm(id);if(!c)return;
+  var q=getQuote(c.quoteId);
+  var lines=q?q.lines.map(function(l){return l.platform+' - '+l.contentType;}).join('\n'):'';
+  var total=q?q.lines.reduce(function(s,l){return s+l.amount;},0):0;
+  var preview='Merhaba '+c.kolId+',\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: '+(q?q.lines.map(function(l){return l.platform;}).join(', '):'')+'\n- İçerik: '+lines+'\n- Paylaşım Tarihi: '+c.publishDate+'\n- Ücret: $'+total.toFixed(2)+'\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code\'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.';
+  var h='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>确认单 '+c.confirmId+'</h3>'+
+    '<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg2);border-radius:var(--radius);">'+preview+'</div>'+
+    (c.signed?'<div style="margin-top:1rem;"><strong>✍️ 签字：</strong><br><img src="'+c.signature+'" style="max-width:300px;border:1px solid var(--border);border-radius:var(--radius);"></div>':'<p style="color:var(--text2);margin-top:1rem;">⚠️ 尚未签字</p>')+
+    '<button class="btn" style="margin-top:1rem;" onclick="this.closest(\'.modal-overlay\').remove()">关闭</button></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+
+// ============ 4. 内容上传 ============
+function renderContent(){
+  var c=document.getElementById('page-content');
+  c.innerHTML='<div class="section"><div class="section-header"><span>📤 合作内容列表（'+CONTENTS.length+'条）</span><button class="btn btn-primary btn-sm" onclick="openContentForm()">+ 上传内容</button></div><div class="table-wrap"><table><thead><tr><th>内容ID</th><th>关联确认单</th><th>KOL</th><th>内容类型</th><th>文件数</th><th>上传时间</th><th>操作</th></tr></thead><tbody id="content-tbody"></tbody></table></div></div>';
+  renderContentTable();
+}
+function renderContentTable(){
+  var tb=document.getElementById('content-tbody');
+  tb.innerHTML=CONTENTS.length===0?'<tr><td colspan="7" class="empty">暂无内容</td></tr>':
+    CONTENTS.map(function(ct){
+      var cf=getConfirm(ct.confirmId);
+      return'<tr><td><strong>'+ct.contentId+'</strong></td><td>'+ct.confirmId+'</td><td>'+(cf?cf.kolId:'—')+'</td><td>'+(ct.files||[]).map(function(f){return f.type;}).join(', ')+'</td><td>'+(ct.files||[]).length+'</td><td>'+ct.uploadDate+'</td><td><button class="action-btn" onclick="openContentForm(\''+ct.id+'\')">✏️</button><button class="action-btn del" onclick="if(confirm(\'删除？\')){CONTENTS=CONTENTS.filter(function(x){return x.id!==\''+ct.id+'\'});save(\'CONTENTS\');renderContentTable();}">✕</button></td></tr>';
+    }).join('');
+}
+function openContentForm(id){
+  var ct=id?CONTENTS.find(function(x){return x.id===id;}):null;
+  var confirmOptions=CONFIRMS.filter(function(c){return c.signed;}).map(function(c){
+    return'<option value="'+c.confirmId+'"'+(ct&&ct.confirmId===c.confirmId?' selected':'')+'>'+c.confirmId+' - '+c.kolId+'</option>';
+  }).join('');
+  if(!confirmOptions)confirmOptions='<option value="">-- 请先生成已签字的确认单 --</option>';
+  var files=ct?ct.files:[];
+  var h='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>'+(ct?'编辑':'上传')+'合作内容</h3>'+
+    '<div class="form-grid"><div class="form-group"><label>关联确认单 *</label><select id="cnt-confirm">'+confirmOptions+'</select></div></div>'+
+    '<div style="margin:1rem 0;"><strong style="font-size:13px;">上传文件</strong></div>'+
+    '<div id="cnt-files">'+(files.length===0?buildContentFile({}):files.map(function(f,i){return buildContentFile(f,i);}).join(''))+'</div>'+
+    '<button class="btn btn-sm" style="margin-bottom:1rem;" onclick="addContentFile()">+ 添加文件</button>'+
+    '<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="saveContent(\''+(ct?ct.id:'')+'\')">保存</button><button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function buildContentFile(f,i){
+  return'<div class="platform-row" id="cnt-file-'+i+'"><div class="form-group"><label>类型</label><select id="cnt-type-'+i+'" style="width:110px;"><option value="reel"'+ (f.type==='reel'?' selected':'')+'>Reel</option><option value="story"'+ (f.type==='story'?' selected':'')+'>Story</option><option value="post"'+ (f.type==='post'?' selected':'')+'>Post</option><option value="video"'+ (f.type==='video'?' selected':'')+'>Video</option><option value="shorts"'+ (f.type==='shorts'?' selected':'')+'>Shorts</option><option value="截图"'+ (f.type==='截图'?' selected':'')+'>截图</option></select></div><div class="form-group"><label>文件名/链接</label><input id="cnt-file-'+i+'" value="'+(f.name||'')+'" placeholder="文件路径或链接"></div><button class="action-btn del" onclick="document.getElementById(\'cnt-file-'+i+'\').remove()">✕</button></div>';
+}
+function addContentFile(){
+  var i=document.querySelectorAll('#cnt-files .platform-row').length;
+  var div=document.createElement('div');div.innerHTML=buildContentFile({},i);
+  document.getElementById('cnt-files').appendChild(div.firstElementChild);
+}
+function saveContent(id){
+  var confirmId=document.getElementById('cnt-confirm').value;
+  if(!confirmId){toast('请选择确认单');return;}
+  var files=[];
+  document.querySelectorAll('#cnt-files .platform-row').forEach(function(row){
+    var t=row.querySelector('select')?.value;
+    var n=row.querySelector('input')?.value.trim();
+    if(t&&n)files.push({type:t,name:n});
+  });
+  var d={
+    id:id||genId('cnt'),
+    contentId:id?(CONTENTS.find(function(x){return x.id===id;})?.contentId):'CNT-'+String(CONTENTS.length+1).padStart(4,'0'),
+    confirmId:confirmId,
+    files:files,
+    uploadDate:new Date().toISOString().slice(0,10)
+  };
+  if(id){var i=CONTENTS.findIndex(function(x){return x.id===id;});if(i>-1){d.contentId=CONTENTS[i].contentId;CONTENTS[i]=d;}}
+  else{CONTENTS.push(d);}
+  save('CONTENTS');renderContentTable();toast('内容保存成功');document.querySelector('.modal-overlay')?.remove();
+}
+
+// ============ 5. 付款 ============
+function renderPayment(){
+  var c=document.getElementById('page-payment');
+  c.innerHTML='<div class="section"><div class="section-header"><span>💳 付款列表（'+PAYMENTS.length+'笔）</span><button class="btn btn-primary btn-sm" onclick="openPaymentForm()">+ 新建付款</button></div><div class="table-wrap"><table><thead><tr><th>付款单ID</th><th>关联确认单</th><th>KOL</th><th>金额($)</th><th>付款日期</th><th>状态</th><th>操作</th></tr></thead><tbody id="payment-tbody"></tbody></table></div></div>';
+  renderPaymentTable();
+}
+function renderPaymentTable(){
+  var tb=document.getElementById('payment-tbody');
+  tb.innerHTML=PAYMENTS.length===0?'<tr><td colspan="7" class="empty">暂无付款</td></tr>':
+    PAYMENTS.map(function(p){
+      var cf=getConfirm(p.confirmId);
+      return'<tr><td><strong>'+p.paymentId+'</strong></td><td>'+p.confirmId+'</td><td>'+(cf?cf.kolId:'—')+'</td><td>$'+p.amount.toFixed(2)+'</td><td>'+p.paymentDate+'</td><td><span class="badge '+(p.paid?'b-paid':'b-unpaid')+'">'+(p.paid?'已付款':'待付款')+'</span></td><td><button class="action-btn" onclick="openPaymentForm(\''+p.id+'\')">✏️</button><button class="action-btn del" onclick="if(confirm(\'删除？\')){PAYMENTS=PAYMENTS.filter(function(x){return x.id!==\''+p.id+'\'});save(\'PAYMENTS\');renderPaymentTable();}">✕</button></td></tr>';
+    }).join('');
+}
+function openPaymentForm(id){
+  var p=id?PAYMENTS.find(function(x){return x.id===id;}):null;
+  var confirmOptions=CONFIRMS.map(function(c){
+    var q=getQuote(c.quoteId);var total=q?q.lines.reduce(function(s,l){return s+l.amount;},0):0;
+    return'<option value="'+c.confirmId+'" data-amount="'+total+'"'+(p&&p.confirmId===c.confirmId?' selected':'')+'>'+c.confirmId+' - '+c.kolId+' ($'+total.toFixed(2)+')</option>';
+  }).join('');
+  if(!confirmOptions)confirmOptions='<option value="">-- 请先生成确认单 --</option>';
+  var h='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>'+(p?'编辑':'新建')+'付款</h3>'+
+    '<div class="form-grid"><div class="form-group"><label>关联确认单 *</label><select id="pm-confirm" onchange="autoFillAmount()">'+confirmOptions+'</select></div>'+
+    '<div class="form-group"><label>金额($)</label><input type="number" id="pm-amount" step="0.01" value="'+(p?p.amount:'')+'"></div>'+
+    '<div class="form-group"><label>付款日期</label><input type="date" id="pm-date" value="'+(p?p.paymentDate:new Date().toISOString().slice(0,10))+'"></div>'+
+    '<div class="form-group"><label>状态</label><select id="pm-paid"><option value="0"'+(p&&!p.paid?' selected':'')+'>待付款</option><option value="1"'+(p&&p.paid?' selected':'')+'>已付款</option></select></div>'+
+    '<div class="form-group"><label>备注</label><input id="pm-note" value="'+(p?p.note:'')+'"></div></div>'+
+    '<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="savePayment(\''+(p?p.id:'')+'\')">保存</button><button class="btn" onclick="this.closest(\'.modal-overlay\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+function autoFillAmount(){
+  var sel=document.getElementById('pm-confirm');
+  var opt=sel.options[sel.selectedIndex];
+  var amount=opt?.dataset?.amount||'';
+  document.getElementById('pm-amount').value=amount;
+}
+function savePayment(id){
+  var confirmId=document.getElementById('pm-confirm').value;
+  if(!confirmId){toast('请选择确认单');return;}
+  var d={
+    id:id||genId('pm'),
+    paymentId:id?(PAYMENTS.find(function(x){return x.id===id;})?.paymentId):'PAY-'+String(PAYMENTS.length+1).padStart(4,'0'),
+    confirmId:confirmId,
+    amount:parseFloat(document.getElementById('pm-amount').value)||0,
+    paymentDate:document.getElementById('pm-date').value,
+    paid:document.getElementById('pm-paid').value==='1',
+    note:document.getElementById('pm-note').value.trim()
+  };
+  if(id){var i=PAYMENTS.findIndex(function(x){return x.id===id;});if(i>-1){d.paymentId=PAYMENTS[i].paymentId;PAYMENTS[i]=d;}}
+  else{PAYMENTS.push(d);}
+  save('PAYMENTS');renderPaymentTable();toast('付款保存成功');document.querySelector('.modal-overlay')?.remove();
+}
+
+// ============ 导出导入 ============
+function exportAll(){
+  var data={KOLS:KOLS,QUOTES:QUOTES,CONFIRMS:CONFIRMS,CONTENTS:CONTENTS,PAYMENTS:PAYMENTS,exportTime:new Date().toISOString()};
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download='KOL_Turkey_Backup.json';a.click();toast('导出成功');
+}
+function importAll(e){
+  var f=e.target.files[0];if(!f)return;
+  var r=new FileReader();r.onload=function(ev){
+    try{var d=JSON.parse(ev.target.result);
+      if(d.KOLS)KOLS=d.KOLS;if(d.QUOTES)QUOTES=d.QUOTES;if(d.CONFIRMS)CONFIRMS=d.CONFIRMS;
+      if(d.CONTENTS)CONTENTS=d.CONTENTS;if(d.PAYMENTS)PAYMENTS=d.PAYMENTS;
+      saveAll();toast('导入成功，刷新中...');setTimeout(function(){location.reload();},800);
+    }catch(err){toast('文件格式错误');}
+  };r.readAsText(f);e.target.value='';
+}
+
+// ============ 初始化 ============
+document.getElementById('page-kol').style.display='block';
+renderKOL();
+</script>
+</body>
+</html>
