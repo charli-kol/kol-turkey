@@ -205,62 +205,6 @@ function renderQuotePage(){
 }
 
 function batchDelQuote(){
-  var ids=getCheckedIds('cb-quote');
-  if(ids.length===0){showToast('请选中至少一条报价单');return;}
-  if(!confirm('⚠️ 第一次确认：确定删除选中的 '+ids.length+' 条报价单吗？\n\n关联的确认单、内容、付款也将被删除！'))return;
-  var affectedConfirms=0,affectedContents=0,affectedPayments=0;
-  ids.forEach(function(qid){
-    var q=QUOTES.find(function(x){return x.id===qid;});
-    if(!q)return;
-    CONFIRMS.forEach(function(c){
-      if(c.quoteId===q.quoteId){
-        affectedConfirms++;
-        CONTENTS.forEach(function(ct){if(ct.confirmId===c.confirmId)affectedContents++;});
-        PAYMENTS.forEach(function(p){if(p.confirmId===c.confirmId)affectedPayments++;});
-      }
-    });
-  });
-  if(!confirm('⚠️ 第二次确认：将删除：\n- 报价单 '+ids.length+' 条\n- 确认单 '+affectedConfirms+' 条\n- 内容 '+affectedContents+' 条\n- 付款 '+affectedPayments+' 条\n\n此操作不可恢复！确定继续？'))return;
-  ids.forEach(function(qid){
-    var q=QUOTES.find(function(x){return x.id===qid;});
-    if(!q)return;
-    var confirmIds=[];
-    CONFIRMS.forEach(function(c){if(c.quoteId===q.quoteId)confirmIds.push(c.confirmId);});
-    confirmIds.forEach(function(cid){
-      CONTENTS=CONTENTS.filter(function(ct){return ct.confirmId!==cid;});
-      PAYMENTS=PAYMENTS.filter(function(p){return p.confirmId!==cid;});
-    });
-    CONFIRMS=CONFIRMS.filter(function(c){return c.quoteId!==q.quoteId;});
-  });
-  QUOTES=QUOTES.filter(function(x){return ids.indexOf(x.id)===-1;});
-  saveOne('QUOTES');saveOne('CONFIRMS');saveOne('CONTENTS');saveOne('PAYMENTS');
-  refreshQuoteTable();refreshConfirmTable();refreshContentTable();refreshPaymentTable();
-  showToast('已删除报价单及关联数据');
-}
-
-function deleteSingleQuote(id,quoteId){
-  if(!confirm('⚠️ 第一次确认：确定删除该报价单吗？\n\n关联的确认单、内容、付款也将被删除！'))return;
-  var affectedConfirms=0,affectedContents=0,affectedPayments=0;
-  CONFIRMS.forEach(function(c){
-    if(c.quoteId===quoteId){
-      affectedConfirms++;
-      CONTENTS.forEach(function(ct){if(ct.confirmId===c.confirmId)affectedContents++;});
-      PAYMENTS.forEach(function(p){if(p.confirmId===c.confirmId)affectedPayments++;});
-    }
-  });
-  if(!confirm('⚠️ 第二次确认：将删除：\n- 确认单 '+affectedConfirms+' 条\n- 内容 '+affectedContents+' 条\n- 付款 '+affectedPayments+' 条\n\n此操作不可恢复！确定继续？'))return;
-  var confirmIds=[];
-  CONFIRMS.forEach(function(c){if(c.quoteId===quoteId)confirmIds.push(c.confirmId);});
-  confirmIds.forEach(function(cid){
-    CONTENTS=CONTENTS.filter(function(ct){return ct.confirmId!==cid;});
-    PAYMENTS=PAYMENTS.filter(function(p){return p.confirmId!==cid;});
-  });
-  CONFIRMS=CONFIRMS.filter(function(c){return c.quoteId!==quoteId;});
-  QUOTES=QUOTES.filter(function(x){return x.id!==id;});
-  saveOne('QUOTES');saveOne('CONFIRMS');saveOne('CONTENTS');saveOne('PAYMENTS');
-  refreshQuoteTable();refreshConfirmTable();refreshContentTable();refreshPaymentTable();
-  showToast('已删除报价单及关联数据');
-}
 
 function refreshQuoteTable(){
   var s=(document.getElementById('quote-search')?.value||'').toLowerCase();
