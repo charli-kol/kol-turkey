@@ -201,7 +201,8 @@ function renderDashData(sd,ed){
       if(f.link&&f.uploadDate&&f.uploadDate>=start&&f.uploadDate<=end){
         // 找到对应的报价明细行，获取单价
         var line=q.lines.find(function(l){return l.platform+' '+l.contentType+' #'===f.type.split(' #')[0]+' #';})||q.lines[0];
-        var unitPrice=line?line.unitPrice||(q.totalPrice/calcWeight(q.lines)*(TYPE_WEIGHT[line.contentType]||1)):0;
+var baseUnit=line?line.unitPrice||(q.totalPrice/calcWeight(q.lines)):0;
+var unitPrice=baseUnit*(TYPE_WEIGHT[line?line.contentType:'video']||1);
         publishedFiles.push({
           uploadDate:f.uploadDate||c.uploadDate,
           accountName:cf.accountName,
@@ -647,7 +648,8 @@ function renderDataTab(){
     (c.files||[]).forEach(function(f){
       if(f.link){
         var line=q?q.lines.find(function(l){return l.platform+' '+l.contentType+' #'===f.type.split(' #')[0]+' #';})||q.lines[0]:null;
-        var unitPrice=line?line.unitPrice||(q.totalPrice/calcWeight(q.lines)*(TYPE_WEIGHT[line.contentType]||1)):0;
+        var baseUnit=line?line.unitPrice||(q.totalPrice/calcWeight(q.lines)):0;
+var unitPrice=baseUnit*(TYPE_WEIGHT[line?line.contentType:'video']||1);
         allFiles.push({
           contentId:c.contentId,confirmId:c.confirmId,accountName:cf.accountName,
           type:f.type,link:f.link,date:f.date||c.uploadDate,
