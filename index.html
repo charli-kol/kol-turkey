@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>土耳其KOL推广管理系统 v13</title>
+<title>土耳其KOL推广管理系统 v14</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -53,6 +55,13 @@ td{padding:10px 12px;border-bottom:1px solid var(--border)}tr:hover td{backgroun
 .b-yes{background:#d3f9d8;color:#0ca678}.b-pending{background:#fff9db;color:#fab005}
 .b-signed{background:#d3f9d8;color:#0ca678}.b-paid{background:#d3f9d8;color:#0ca678}.b-unpaid{background:#ffe3e3;color:#c92a2a}
 
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:1.5rem}
+.metric-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.2rem;transition:all .2s}
+.metric-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.metric-label{font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+.metric-value{font-size:20px;font-weight:700}
+.metric-sub{font-size:11px;color:var(--text2);margin-top:4px}
+
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1rem}
 .form-group{display:flex;flex-direction:column;gap:5px}
 .form-group label{font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
@@ -78,13 +87,15 @@ td{padding:10px 12px;border-bottom:1px solid var(--border)}tr:hover td{backgroun
 
 .info-box{padding:12px;background:var(--bg2);border-radius:var(--radius);margin:8px 0;font-size:13px}
 .check-col{width:40px;text-align:center}
+.chart-wrap{height:260px}
+.filter-row{display:flex;gap:10px;margin-bottom:1rem;flex-wrap:wrap;align-items:flex-end}
 </style>
 </head>
 <body>
 <div class="container">
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:16px;">
-  <div><h1 style="font-size:22px;font-weight:700;">🇹🇷 土耳其KOL推广管理 v13</h1></div>
+  <div><h1 style="font-size:22px;font-weight:700;">🇹🇷 土耳其KOL推广管理 v14</h1></div>
   <div style="display:flex;gap:8px;">
     <button class="btn btn-sm" onclick="exportAll()">📦 导出备份</button>
     <button class="btn btn-sm" onclick="document.getElementById('import-file').click()">📥 导入备份</button>
@@ -93,14 +104,16 @@ td{padding:10px 12px;border-bottom:1px solid var(--border)}tr:hover td{backgroun
 </div>
 
 <div class="tabs" id="main-tabs">
-  <button class="tab active" data-tab="kol">📇 主播录入</button>
+  <button class="tab active" data-tab="dashboard">📊 数据看板</button>
+  <button class="tab" data-tab="kol">📇 主播录入</button>
   <button class="tab" data-tab="quote">💰 报价管理</button>
   <button class="tab" data-tab="confirm">📝 确认单</button>
   <button class="tab" data-tab="content">📤 内容上传</button>
   <button class="tab" data-tab="payment">💳 付款</button>
 </div>
 
-<div id="page-kol" class="page"></div>
+<div id="page-dashboard" class="page"></div>
+<div id="page-kol" class="page" style="display:none;"></div>
 <div id="page-quote" class="page" style="display:none;"></div>
 <div id="page-confirm" class="page" style="display:none;"></div>
 <div id="page-content" class="page" style="display:none;"></div>
@@ -129,7 +142,7 @@ function findQuote(qid){return QUOTES.find(function(q){return q.quoteId===qid;})
 function findConfirm(cid){return CONFIRMS.find(function(c){return c.confirmId===cid;});}
 loadAll();
 
-// ============ 页面切换 ============
+// 页面切换
 document.getElementById('main-tabs').addEventListener('click',function(e){
   var t=e.target.closest('.tab');if(!t)return;
   document.querySelectorAll('#main-tabs .tab').forEach(function(b){b.classList.remove('active');});
@@ -153,124 +166,79 @@ function toggleAll(master,prefix){
 }
 
 // ============ 0. 数据看板 ============
+var dashCharts={};
 function renderDashboardPage(){
-  var page = document.getElementById('page-dashboard');
+  var page=document.getElementById('page-dashboard');
   if(!page.innerHTML){
-    page.innerHTML = `
-      <div class="section">
-        <div class="section-header"><span>📊 数据看板</span></div>
-        <div class="filter-row">
-          <button class="btn btn-sm active" onclick="dashboardFilter('week', this)">本周</button>
-          <button class="btn btn-sm" onclick="dashboardFilter('month', this)">本月</button>
-          <label style="margin-left:12px;font-size:12px;">开始</label><input type="date" id="dash-sd" style="width:140px;">
-          <label style="font-size:12px;">结束</label><input type="date" id="dash-ed" style="width:140px;">
-          <button class="btn btn-primary btn-sm" onclick="dashboardFilter('custom')">查询</button>
-        </div>
-      </div>
-      <div class="metrics-grid" id="dash-metrics"></div>
-      <div class="two-col">
-        <div class="section"><div class="section-header">💰 每日消耗</div><div class="chart-wrap"><canvas id="dash-cost-chart"></canvas></div></div>
-        <div class="section"><div class="section-header">📤 每日发布内容数</div><div class="chart-wrap"><canvas id="dash-publish-chart"></canvas></div></div>
-      </div>
-      <div class="two-col">
-        <div class="section"><div class="section-header">👀 每日播放量</div><div class="chart-wrap"><canvas id="dash-views-chart"></canvas></div></div>
-        <div class="section"><div class="section-header">📈 累计数据趋势</div><div class="chart-wrap"><canvas id="dash-cumulative-chart"></canvas></div></div>
-      </div>`;
+    page.innerHTML='<div class="section"><div class="section-header"><span>📊 数据看板</span></div><div class="filter-row"><button class="btn btn-sm active" onclick="dashFilter(\'week\',this)">本周</button><button class="btn btn-sm" onclick="dashFilter(\'month\',this)">本月</button><button class="btn btn-sm" onclick="dashFilter(\'lastmonth\',this)">上月</button><label style="margin-left:12px;font-size:12px;">开始</label><input type="date" id="dash-sd" style="width:140px;"><label style="font-size:12px;">结束</label><input type="date" id="dash-ed" style="width:140px;"><button class="btn btn-primary btn-sm" onclick="dashFilter(\'custom\')">查询</button></div></div><div class="metrics-grid" id="dash-metrics"></div><div class="two-col"><div class="section"><div class="section-header">💰 每日消耗</div><div class="chart-wrap"><canvas id="dash-cost-chart"></canvas></div></div><div class="section"><div class="section-header">📤 每日发布内容数</div><div class="chart-wrap"><canvas id="dash-publish-chart"></canvas></div></div></div><div class="two-col"><div class="section"><div class="section-header">👀 每日播放量</div><div class="chart-wrap"><canvas id="dash-views-chart"></canvas></div></div><div class="section"><div class="section-header">📋 发布内容明细</div><div class="table-wrap" style="max-height:260px;overflow-y:auto;"><table><thead><tr><th>日期</th><th>主播</th><th>平台/形式</th><th>链接</th><th>播放量</th></tr></thead><tbody id="dash-detail-tbody"></tbody></table></div></div></div>';
   }
-  dashboardFilter('week');
+  dashFilter('week');
 }
 
-function dashboardFilter(type, btn){
-  document.querySelectorAll('#page-dashboard .filter-row .btn').forEach(b => b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  var td = new Date(), sd, ed;
-  if(type === 'week'){
-    var dow = td.getDay() || 7;
-    sd = new Date(td); sd.setDate(td.getDate() - dow + 1);
-    ed = new Date(sd); ed.setDate(sd.getDate() + 6);
-  } else if(type === 'month'){
-    sd = new Date(td.getFullYear(), td.getMonth(), 1);
-    ed = new Date(td.getFullYear(), td.getMonth() + 1, 0);
-  } else {
-    sd = document.getElementById('dash-sd').value;
-    ed = document.getElementById('dash-ed').value;
-    if(!sd || !ed) return;
-  }
-  if(type !== 'custom'){
-    document.getElementById('dash-sd').value = sd.toISOString().slice(0,10);
-    document.getElementById('dash-ed').value = ed.toISOString().slice(0,10);
-  }
-  renderDashboardData(sd, ed);
+function dashFilter(type,btn){
+  document.querySelectorAll('#page-dashboard .filter-row .btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  var td=new Date(),sd,ed;
+  if(type==='week'){var dow=td.getDay()||7;sd=new Date(td);sd.setDate(td.getDate()-dow+1);ed=new Date(sd);ed.setDate(sd.getDate()+6);}
+  else if(type==='month'){sd=new Date(td.getFullYear(),td.getMonth(),1);ed=new Date(td.getFullYear(),td.getMonth()+1,0);}
+  else if(type==='lastmonth'){sd=new Date(td.getFullYear(),td.getMonth()-1,1);ed=new Date(td.getFullYear(),td.getMonth(),0);}
+  else{sd=document.getElementById('dash-sd').value;ed=document.getElementById('dash-ed').value;if(!sd||!ed)return;}
+  if(type!=='custom'){document.getElementById('dash-sd').value=sd.toISOString().slice(0,10);document.getElementById('dash-ed').value=ed.toISOString().slice(0,10);}
+  renderDashData(sd,ed);
 }
 
-function renderDashboardData(sd, ed){
-  var isStr = typeof sd === 'string';
-  var start = isStr ? sd : sd.toISOString().slice(0,10);
-  var end = isStr ? ed : ed.toISOString().slice(0,10);
-  
-  // 聚合消耗
-  var filteredCosts = QUOTES.filter(function(q){ return q.confirmed && q.createdAt >= start && q.createdAt <= end; });
-  var totalCost = filteredCosts.reduce(function(s, q){ return s + q.totalPrice; }, 0);
-  
-  // 聚合内容
-  var filteredContents = CONTENTS.filter(function(c){ return c.uploadDate >= start && c.uploadDate <= end; });
-  var totalPublished = filteredContents.length;
-  var totalFiles = filteredContents.reduce(function(s, c){ return s + (c.files ? c.files.length : 0); }, 0);
-  var totalViews = filteredContents.reduce(function(s, c){ 
-    return s + (c.files ? c.files.reduce(function(ss, f){ return ss + (parseInt(f.views)||0); }, 0) : 0); 
-  }, 0);
-  
-  // 付款情况
-  var filteredPayments = PAYMENTS.filter(function(p){ return p.paymentDate >= start && p.paymentDate <= end; });
-  var totalPaid = filteredPayments.filter(function(p){ return p.paid; }).reduce(function(s, p){ return s + p.amount; }, 0);
-  var totalUnpaid = filteredPayments.filter(function(p){ return !p.paid; }).reduce(function(s, p){ return s + p.amount; }, 0);
+function renderDashData(sd,ed){
+  var start=typeof sd==='string'?sd:sd.toISOString().slice(0,10);
+  var end=typeof ed==='string'?ed:ed.toISOString().slice(0,10);
 
-  document.getElementById('dash-metrics').innerHTML = [
-    {l:'总消耗', v:'$'+totalCost.toFixed(2)},
-    {l:'合作单数', v:filteredCosts.length},
-    {l:'发布内容数', v:totalPublished},
-    {l:'文件/链接数', v:totalFiles},
-    {l:'总播放量', v:totalViews.toLocaleString()},
-    {l:'已付款', v:'$'+totalPaid.toFixed(2)},
-    {l:'待付款', v:'$'+totalUnpaid.toFixed(2)},
-    {l:'平均单条播放', v: totalFiles > 0 ? Math.round(totalViews/totalFiles).toLocaleString() : '—'}
-  ].map(function(x){ return '<div class="metric-card"><div class="metric-label">'+x.l+'</div><div class="metric-value" style="font-size:18px;">'+x.v+'</div></div>'; }).join('');
+  // 消耗：已确认的报价单
+  var confirmedQuotes=QUOTES.filter(function(q){return q.confirmed&&q.createdAt>=start&&q.createdAt<=end;});
+  var totalCost=confirmedQuotes.reduce(function(s,q){return s+q.totalPrice;},0);
 
-  // 图表数据准备
-  var dates = [];
-  var current = new Date(start);
-  var endDate = new Date(end);
-  while(current <= endDate){
-    dates.push(current.toISOString().slice(0,10));
-    current.setDate(current.getDate() + 1);
-  }
-  var labels = dates.map(function(d){ return d.slice(5); });
-  
-  var dailyCost = dates.map(function(d){ return QUOTES.filter(function(q){ return q.confirmed && q.createdAt === d; }).reduce(function(s,q){ return s+q.totalPrice; },0); });
-  var dailyPublish = dates.map(function(d){ return CONTENTS.filter(function(c){ return c.uploadDate === d; }).length; });
-  var dailyViews = dates.map(function(d){ return CONTENTS.filter(function(c){ return c.uploadDate === d; }).reduce(function(s,c){ return s + (c.files ? c.files.reduce(function(ss,f){ return ss + (parseInt(f.views)||0); },0) : 0); },0); });
-  
-  var isDark = matchMedia('(prefers-color-scheme:dark)').matches;
-  var tc = isDark?'#909296':'#6c757d', gc = isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.04)';
-  var chartOpts = {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc}}}};
-  
-  ['dash-cost-chart','dash-publish-chart','dash-views-chart','dash-cumulative-chart'].forEach(function(id){ if(window._charts&&window._charts[id]) window._charts[id].destroy(); });
-  if(!window._charts) window._charts = {};
-  
-  window._charts['dash-cost-chart'] = new Chart(document.getElementById('dash-cost-chart'), {type:'bar', data:{labels:labels, datasets:[{data:dailyCost, backgroundColor:'rgba(12,166,120,.6)', borderRadius:4}]}, options:chartOpts});
-  window._charts['dash-publish-chart'] = new Chart(document.getElementById('dash-publish-chart'), {type:'bar', data:{labels:labels, datasets:[{data:dailyPublish, backgroundColor:'rgba(59,130,246,.6)', borderRadius:4}]}, options:chartOpts});
-  window._charts['dash-views-chart'] = new Chart(document.getElementById('dash-views-chart'), {type:'line', data:{labels:labels, datasets:[{data:dailyViews, borderColor:'#f59e0b', backgroundColor:'rgba(245,158,11,.1)', tension:.3, fill:true, pointRadius:2, borderWidth:2}]}, options:chartOpts});
-  
-  var cumCost = 0, cumViews = 0;
-  var cumCostData = dailyCost.map(function(v){ cumCost += v; return cumCost; });
-  var cumViewsData = dailyViews.map(function(v){ cumViews += v; return cumViews; });
-  window._charts['dash-cumulative-chart'] = new Chart(document.getElementById('dash-cumulative-chart'), {type:'line', data:{labels:labels, datasets:[
-    {label:'累计消耗', data:cumCostData, borderColor:'#0ca678', tension:.3, pointRadius:1, borderWidth:2, yAxisID:'y'},
-    {label:'累计播放', data:cumViewsData, borderColor:'#f59e0b', tension:.3, pointRadius:1, borderWidth:2, yAxisID:'y1'}
-  ]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}}}, scales:{x:{grid:{display:false},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc},position:'left'},y1:{grid:{display:false},ticks:{color:tc},position:'right'}}}});
+  // 内容
+  var filteredContents=CONTENTS.filter(function(c){return c.uploadDate>=start&&c.uploadDate<=end;});
+  var totalPublished=filteredContents.length;
+  var allFiles=[];
+  filteredContents.forEach(function(c){(c.files||[]).forEach(function(f){allFiles.push({contentId:c.contentId,uploadDate:c.uploadDate,confirmId:c.confirmId,type:f.type,link:f.link,date:f.date,views:f.views||0});});});
+  var totalFiles=allFiles.length;
+  var totalViews=allFiles.reduce(function(s,f){return s+(parseInt(f.views)||0);},0);
+
+  // 付款
+  var filteredPayments=PAYMENTS.filter(function(p){return p.paymentDate>=start&&p.paymentDate<=end;});
+  var totalPaid=filteredPayments.filter(function(p){return p.paid;}).reduce(function(s,p){return s+p.amount;},0);
+  var totalUnpaid=filteredPayments.filter(function(p){return!p.paid;}).reduce(function(s,p){return s+p.amount;},0);
+
+  document.getElementById('dash-metrics').innerHTML=[
+    {l:'总消耗',v:'$'+totalCost.toFixed(2)},{l:'合作单数',v:confirmedQuotes.length},
+    {l:'发布内容数',v:totalPublished},{l:'文件/链接数',v:totalFiles},
+    {l:'总播放量',v:totalViews.toLocaleString()},{l:'已付款',v:'$'+totalPaid.toFixed(2)},
+    {l:'待付款',v:'$'+totalUnpaid.toFixed(2)},{l:'平均单条播放',v:totalFiles>0?Math.round(totalViews/totalFiles).toLocaleString():'—'}
+  ].map(function(x){return'<div class="metric-card"><div class="metric-label">'+x.l+'</div><div class="metric-value" style="font-size:18px;">'+x.v+'</div></div>';}).join('');
+
+  // 图表
+  var dates=[];var current=new Date(start);var endDate=new Date(end);
+  while(current<=endDate){dates.push(current.toISOString().slice(0,10));current.setDate(current.getDate()+1);}
+  var labels=dates.map(function(d){return d.slice(5);});
+  var dailyCost=dates.map(function(d){return QUOTES.filter(function(q){return q.confirmed&&q.createdAt===d;}).reduce(function(s,q){return s+q.totalPrice;},0);});
+  var dailyPublish=dates.map(function(d){return allFiles.filter(function(f){return f.uploadDate===d;}).length;});
+  var dailyViews=dates.map(function(d){return allFiles.filter(function(f){return f.uploadDate===d;}).reduce(function(s,f){return s+(parseInt(f.views)||0);},0);});
+
+  var isDark=matchMedia('(prefers-color-scheme:dark)').matches;
+  var tc=isDark?'#909296':'#6c757d',gc=isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.04)';
+  var opts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc}}}};
+  ['dash-cost-chart','dash-publish-chart','dash-views-chart'].forEach(function(id){if(dashCharts[id])dashCharts[id].destroy();});
+  dashCharts['dash-cost-chart']=new Chart(document.getElementById('dash-cost-chart'),{type:'bar',data:{labels:labels,datasets:[{data:dailyCost,backgroundColor:'rgba(12,166,120,.6)',borderRadius:4}]},options:opts});
+  dashCharts['dash-publish-chart']=new Chart(document.getElementById('dash-publish-chart'),{type:'bar',data:{labels:labels,datasets:[{data:dailyPublish,backgroundColor:'rgba(59,130,246,.6)',borderRadius:4}]},options:opts});
+  dashCharts['dash-views-chart']=new Chart(document.getElementById('dash-views-chart'),{type:'line',data:{labels:labels,datasets:[{data:dailyViews,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.1)',tension:.3,fill:true,pointRadius:2,borderWidth:2}]},options:opts});
+
+  // 明细表
+  var detailTbody=document.getElementById('dash-detail-tbody');
+  var detailList=allFiles.sort(function(a,b){return b.uploadDate.localeCompare(a.uploadDate);}).slice(0,50);
+  detailTbody.innerHTML=detailList.length===0?'<tr><td colspan="5" class="empty">暂无数据</td></tr>':
+    detailList.map(function(f){var cf=findConfirm(f.confirmId);return'<tr><td>'+f.uploadDate+'</td><td>'+(cf?cf.accountName:'—')+'</td><td>'+f.type+'</td><td>'+(f.link?'<a href="'+f.link+'" target="_blank">🔗</a>':'—')+'</td><td>'+(f.views||0).toLocaleString()+'</td></tr>';}).join('');
 }
 
-// ============ 1. 主播录入（增加播放量字段） ============
+// ============ 1. 主播录入 ============
 function renderKOLPage(){
   document.getElementById('page-kol').innerHTML='<div class="section"><div class="section-header"><span>📇 主播列表（'+KOLS.length+'人）</span><div style="display:flex;gap:8px;"><button class="btn btn-danger btn-sm" onclick="batchDelKOL()">🗑 批量删除</button><button class="btn btn-primary btn-sm" onclick="openKOLForm()">+ 新增主播</button></div></div><div class="table-wrap"><table><thead><tr><th class="check-col"><input type="checkbox" onchange="toggleAll(this,\'cb-kol\')"></th><th>账号</th><th>平台</th><th>主页</th><th>粉丝</th><th>平均播放</th><th>Email</th><th>手机</th><th>近30天视频</th><th>操作</th></tr></thead><tbody id="kol-tbody"></tbody></table></div></div>';
   refreshKOLTable();
@@ -308,25 +276,370 @@ function saveKOLForm(id){
   saveOne('KOLS');refreshKOLTable();showToast('保存成功');document.getElementById('kol-modal').remove();
 }
 
-// ... (此处保留你原有的 报价管理、确认单等所有代码，完全不动) ...
+// ============ 2. 报价管理 ============
+function genQuoteId(accountName,lines){
+  var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var plats=[];lines.forEach(function(l){if(plats.indexOf(l.platform)===-1)plats.push(l.platform);});
+  var ps=plats.length===1?plats[0]:'Multi';
+  var prefix='Q-TR-'+accountName+'-'+ps+'-'+date+'-';
+  var cnt=0;QUOTES.forEach(function(q){if(q.quoteId.indexOf(prefix)===0)cnt++;});
+  return prefix+String(cnt+1).padStart(2,'0');
+}
+function calcWeight(lines){var tw=0;lines.forEach(function(l){tw+=(TYPE_WEIGHT[l.contentType]||1)*l.count;});return tw;}
 
-// 只需要修改 内容上传 的 buildContentFile 和 doSaveContent，加入播放量
+function renderQuotePage(){
+  document.getElementById('page-quote').innerHTML='<div class="section"><div class="section-header"><span>💰 报价单列表（'+QUOTES.length+'份）</span><div style="display:flex;gap:8px;"><button class="btn btn-danger btn-sm" onclick="batchDelQuote()">🗑 批量删除</button><button class="btn btn-primary btn-sm" onclick="openQuoteForm()">+ 新建报价单</button></div></div><input type="text" id="quote-search" placeholder="搜索报价单ID..." style="width:280px;margin-bottom:1rem;" oninput="refreshQuoteTable()"><div class="table-wrap"><table><thead><tr><th class="check-col"><input type="checkbox" onchange="toggleAll(this,\'cb-quote\')"></th><th>报价单ID</th><th>主播</th><th>报价明细</th><th>总价</th><th>状态</th><th>操作</th></tr></thead><tbody id="quote-tbody"></tbody></table></div></div>';
+  refreshQuoteTable();
+}
 
-// 找到 searchForContent 函数中，构建上传行的地方
-// 原代码: row.innerHTML='<div class="form-group"><label>'+l.platform+' '+l.contentType+' #'+(j+1)+'</label><input id="cnt-link-'+rid+'" placeholder="链接"...
-// 替换为下面这段（增加了播放量输入框）：
-// row.innerHTML='<div class="form-group"><label>'+l.platform+' '+l.contentType+' #'+(j+1)+'</label><input id="cnt-link-'+rid+'" placeholder="链接" value="'+(ex?ex.link:'')+'" style="width:200px;"></div><div class="form-group"><label>日期</label><input type="date" id="cnt-date-'+rid+'" value="'+(ex?ex.date:'')+'"></div><div class="form-group"><label>播放量</label><input type="number" id="cnt-views-'+rid+'" value="'+(ex?ex.views:'')+'" style="width:80px;"></div>';
+function cascadeDeleteByQuoteIds(quoteIds){
+  if(quoteIds.length===0)return;
+  var confirmIds=[];
+  CONFIRMS.forEach(function(c){if(quoteIds.indexOf(c.quoteId)!==-1)confirmIds.push(c.confirmId);});
+  CONTENTS=CONTENTS.filter(function(ct){return confirmIds.indexOf(ct.confirmId)===-1;});
+  PAYMENTS=PAYMENTS.filter(function(p){return confirmIds.indexOf(p.confirmId)===-1;});
+  CONFIRMS=CONFIRMS.filter(function(c){return quoteIds.indexOf(c.quoteId)===-1;});
+  QUOTES=QUOTES.filter(function(q){return quoteIds.indexOf(q.quoteId)===-1;});
+}
 
-// 找到 doSaveContent 函数，修改收集数据的部分
-// 原代码: var li=row.querySelector('input[id^="cnt-link-"]'),di=row.querySelector('input[type="date"]')...
-// 替换为:
-// var li=row.querySelector('input[id^="cnt-link-"]'),di=row.querySelector('input[type="date"]'),vi=row.querySelector('input[id^="cnt-views-"]'),la=row.querySelector('label'),l=li?li.value.trim():'',d=di?di.value:'',v=vi?vi.value:'',lb=la?la.textContent:'',rid=li?li.id.replace('cnt-link-',''):'';
-// if(l){hasAny=true;files.push({reqId:rid,type:lb,link:l,date:d||'',views:v||0});}
+function batchDelQuote(){
+  var ids=getCheckedIds('cb-quote');
+  if(ids.length===0){showToast('请选中至少一条报价单');return;}
+  var quoteIds=[];
+  ids.forEach(function(id){var q=QUOTES.find(function(x){return x.id===id;});if(q)quoteIds.push(q.quoteId);});
+  if(quoteIds.length===0)return;
+  var ac=0,act=0,ap=0;
+  CONFIRMS.forEach(function(c){if(quoteIds.indexOf(c.quoteId)!==-1){ac++;CONTENTS.forEach(function(ct){if(ct.confirmId===c.confirmId)act++;});PAYMENTS.forEach(function(p){if(p.confirmId===c.confirmId)ap++;});}});
+  if(!confirm('⚠️ 第一次确认：删除 '+ids.length+' 条报价单？\n\n关联的确认单('+ac+')、内容('+act+')、付款('+ap+')也将被删除！'))return;
+  if(!confirm('⚠️ 第二次确认：此操作不可恢复！确定继续？'))return;
+  cascadeDeleteByQuoteIds(quoteIds);
+  saveOne('QUOTES');saveOne('CONFIRMS');saveOne('CONTENTS');saveOne('PAYMENTS');
+  refreshQuoteTable();refreshConfirmTable();refreshContentTable();refreshPaymentTable();
+  showToast('已彻底删除');
+}
 
-// 付款单ID格式优化，找到 genPaymentId 函数，改成:
-// function genPaymentId(accountName){var date=new Date().toISOString().slice(0,10).replace(/-/g,''),prefix='P-TR-'+accountName+'-'+date+'-',cnt=0;PAYMENTS.forEach(function(p){if(p.paymentId.indexOf(prefix)===0)cnt++;});return prefix+String(cnt+1).padStart(2,'0');}
+function deleteSingleQuote(id,quoteId){
+  var ac=0,act=0,ap=0;
+  CONFIRMS.forEach(function(c){if(c.quoteId===quoteId){ac++;CONTENTS.forEach(function(ct){if(ct.confirmId===c.confirmId)act++;});PAYMENTS.forEach(function(p){if(p.confirmId===c.confirmId)ap++;});}});
+  if(!confirm('⚠️ 第一次确认：删除该报价单？\n关联确认单('+ac+')、内容('+act+')、付款('+ap+')也将被删除！'))return;
+  if(!confirm('⚠️ 第二次确认：此操作不可恢复！确定继续？'))return;
+  cascadeDeleteByQuoteIds([quoteId]);
+  saveOne('QUOTES');saveOne('CONFIRMS');saveOne('CONTENTS');saveOne('PAYMENTS');
+  refreshQuoteTable();refreshConfirmTable();refreshContentTable();refreshPaymentTable();
+  showToast('已彻底删除');
+}
 
-// 启动
+function refreshQuoteTable(){
+  var s=(document.getElementById('quote-search')?.value||'').toLowerCase();
+  var list=QUOTES.filter(function(q){return q.quoteId.toLowerCase().indexOf(s)>-1;});
+  var tb=document.getElementById('quote-tbody');
+  if(list.length===0){tb.innerHTML='<tr><td colspan="7" class="empty">暂无</td></tr>';return;}
+  tb.innerHTML=list.map(function(q){
+    var lines=q.lines||[];
+    return'<tr><td class="check-col"><input type="checkbox" id="cb-quote-'+q.id+'" data-id="'+q.id+'"></td><td><strong>'+q.quoteId+'</strong></td><td>'+q.accountName+'</td><td>'+lines.map(function(l){return l.platform+':'+l.count+l.contentType;}).join(' + ')+'</td><td>$'+(q.totalPrice||0).toFixed(2)+'</td><td><span class="badge '+(q.confirmed?'b-yes':'b-pending')+'">'+(q.confirmed?'已确认':'待确认')+'</span></td><td><button class="action-btn" onclick="openQuoteForm(\''+q.id+'\')">✏️</button><button class="action-btn del" onclick="deleteSingleQuote(\''+q.id+'\',\''+q.quoteId+'\')">✕</button></td></tr>';
+  }).join('');
+}
+
+function lockQuotePlatform(){
+  var kolName=document.getElementById('qf-kol').value.trim();
+  var kol=findKol(kolName);
+  if(!kol)return;
+  document.querySelectorAll('#qf-lines select[id^="ql-platform-"]').forEach(function(sel){
+    sel.value=kol.platform;sel.disabled=true;onPlatformChange(sel);
+  });
+}
+
+function openQuoteForm(id){
+  var q=id?QUOTES.find(function(x){return x.id===id;}):null;
+  var lines=q?q.lines:[];
+  var h='<div class="modal-overlay" id="quote-modal" onclick="if(event.target===this)this.remove()"><div class="modal" style="max-width:850px;"><h3>'+(q?'编辑':'新建')+'报价单</h3>';
+  h+='<div class="form-grid"><div class="form-group"><label>主播账号 *</label><div class="autocomplete-wrap"><input id="qf-kol" value="'+(q?q.accountName:'')+'" placeholder="输入已录入的账号" autocomplete="off"><div class="autocomplete-list" id="qf-kol-list"></div></div></div>';
+  h+='<div class="form-group"><label>组合总价($) *</label><input type="number" id="qf-total" step="0.01" value="'+(q?q.totalPrice:'')+'" placeholder="如 200"></div>';
+  h+='<div class="form-group"><label>备注</label><input id="qf-note" value="'+(q?q.note:'')+'"></div></div>';
+  h+='<div class="info-box">平台将自动锁定为主播录入时的平台，折算标准：1 video = 4 comment</div>';
+  h+='<div style="margin:1rem 0;"><strong>合作明细</strong></div><div id="qf-lines">';
+  if(lines.length===0){h+=makeQuoteLine({},0);}else{lines.forEach(function(l,i){h+=makeQuoteLine(l,i);});}
+  h+='</div><button class="btn btn-sm" onclick="addQuoteLine()">+ 添加明细</button>';
+  h+='<div id="qf-calc" style="margin-top:8px;font-size:12px;color:var(--text2);"></div>';
+  h+='<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="doSaveQuote(\''+(q?q.id:'')+'\')">保存</button><button class="btn" onclick="document.getElementById(\'quote-modal\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+  setupAutoComplete('qf-kol','qf-kol-list',KOLS.map(function(k){return k.accountName;}));
+  var kolInput=document.getElementById('qf-kol');
+  kolInput.addEventListener('input',function(){lockQuotePlatform();});
+  kolInput.addEventListener('blur',function(){setTimeout(function(){lockQuotePlatform();},150);});
+  document.querySelectorAll('#qf-lines select[id^="ql-platform-"]').forEach(function(sel){sel.addEventListener('change',function(){onPlatformChange(this);});});
+  var totalEl=document.getElementById('qf-total');if(totalEl)totalEl.addEventListener('input',function(){updateCalc();});
+  document.querySelectorAll('#qf-lines input, #qf-lines select').forEach(function(el){el.addEventListener('change',function(){updateCalc();});});
+  if(q){var kol=findKol(q.accountName);if(kol){document.querySelectorAll('#qf-lines select[id^="ql-platform-"]').forEach(function(sel){sel.value=kol.platform;sel.disabled=true;});}}
+  setTimeout(function(){updateCalc();},100);
+}
+
+function setupAutoComplete(inpId,listId,source){
+  var inp=document.getElementById(inpId),list=document.getElementById(listId);if(!inp||!list)return;
+  inp.addEventListener('input',function(){var val=inp.value.trim().toLowerCase();list.innerHTML='';if(!val){list.style.display='none';return;}var matches=source.filter(function(s){return s.toLowerCase().indexOf(val)>-1;});if(!matches.length){list.style.display='none';return;}matches.forEach(function(m){var d=document.createElement('div');d.textContent=m;d.addEventListener('click',function(){inp.value=m;list.style.display='none';lockQuotePlatform();});list.appendChild(d);});list.style.display='block';});
+  inp.addEventListener('blur',function(){setTimeout(function(){list.style.display='none';},150);});
+}
+
+function makeQuoteLine(l,i){
+  var types=CONTENT_TYPES[l.platform||'TikTok'];
+  return'<div class="platform-row" id="ql-row-'+i+'"><div class="form-group"><label>平台</label><select id="ql-platform-'+i+'" style="width:120px;">'+PLATFORMS.map(function(p){return'<option value="'+p+'"'+(l.platform===p?' selected':'')+'>'+p+'</option>';}).join('')+'</select></div><div class="form-group"><label>形式</label><select id="ql-type-'+i+'" style="width:130px;">'+types.map(function(t){return'<option value="'+t+'"'+(l.contentType===t?' selected':'')+'>'+t+'</option>';}).join('')+'</select></div><div class="form-group"><label>数量</label><input type="number" id="ql-count-'+i+'" value="'+(l.count||1)+'" min="1" style="width:70px;"></div><button class="action-btn del" onclick="document.getElementById(\'ql-row-'+i+'\').remove();updateCalc();">✕</button></div>';
+}
+
+function addQuoteLine(){
+  var i=document.querySelectorAll('#qf-lines .platform-row').length;
+  var div=document.createElement('div');div.innerHTML=makeQuoteLine({},i);
+  document.getElementById('qf-lines').appendChild(div.firstElementChild);
+  var sel=document.getElementById('ql-platform-'+i);
+  if(sel){sel.addEventListener('change',function(){onPlatformChange(this);});var kolName=document.getElementById('qf-kol').value.trim();var kol=findKol(kolName);if(kol){sel.value=kol.platform;sel.disabled=true;}}
+  document.querySelectorAll('#ql-row-'+i+' input, #ql-row-'+i+' select').forEach(function(el){el.addEventListener('change',function(){updateCalc();});});
+  updateCalc();
+}
+
+function onPlatformChange(sel){
+  var types=CONTENT_TYPES[sel.value];
+  sel.closest('.platform-row').querySelector('select[id^="ql-type-"]').innerHTML=types.map(function(t){return'<option value="'+t+'">'+t+'</option>';}).join('');
+  updateCalc();
+}
+
+function updateCalc(){
+  var total=parseFloat(document.getElementById('qf-total')?.value)||0;
+  var tempLines=[];document.querySelectorAll('#qf-lines .platform-row').forEach(function(row){var p=row.querySelector('select[id^="ql-platform-"]')?.value;var t=row.querySelector('select[id^="ql-type-"]')?.value;var c=parseInt(row.querySelector('input[id^="ql-count-"]')?.value)||0;if(p&&t&&c>0)tempLines.push({platform:p,contentType:t,count:c});});
+  var calcDiv=document.getElementById('qf-calc');if(!tempLines.length||total<=0){calcDiv.textContent='请填写总价和明细';return;}
+  var tw=calcWeight(tempLines);var up=total/tw;
+  calcDiv.innerHTML='单价基数: $'+up.toFixed(4)+'/权重 | '+tempLines.map(function(l){var w=(TYPE_WEIGHT[l.contentType]||1)*l.count;return l.platform+' '+l.count+l.contentType+' = $'+(up*w).toFixed(2);}).join(' | ');
+}
+
+function doSaveQuote(id){
+  var accountName=document.getElementById('qf-kol').value.trim();if(!accountName){showToast('请输入主播账号');return;}
+  var kol=findKol(accountName);if(!kol){showToast('主播未录入，请先在主播录入中添加');return;}
+  var totalPrice=parseFloat(document.getElementById('qf-total').value)||0;if(totalPrice<=0){showToast('请填写总价');return;}
+  var tempLines=[];document.querySelectorAll('#qf-lines .platform-row').forEach(function(row){var p=row.querySelector('select[id^="ql-platform-"]')?.value;var t=row.querySelector('select[id^="ql-type-"]')?.value;var c=parseInt(row.querySelector('input[id^="ql-count-"]')?.value)||0;if(p&&t&&c>0)tempLines.push({platform:p,contentType:t,count:c});});
+  if(!tempLines.length){showToast('请添加明细');return;}
+  var wrongPlatform=tempLines.find(function(l){return l.platform!==kol.platform;});
+  if(wrongPlatform){showToast('合作平台必须与主播录入平台一致：'+kol.platform);return;}
+  var tw=calcWeight(tempLines);var up=totalPrice/tw;
+  tempLines.forEach(function(l){l.unitPrice=up;l.subtotal=up*(TYPE_WEIGHT[l.contentType]||1)*l.count;});
+  var old=id?QUOTES.find(function(x){return x.id===id;}):null;
+  var plats=[];tempLines.forEach(function(l){if(plats.indexOf(l.platform)===-1)plats.push(l.platform);});
+  var ps=plats.length===1?plats[0]:'Multi';
+  var date=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  var prefix='Q-TR-'+accountName+'-'+ps+'-'+date+'-';
+  var cnt=0;QUOTES.forEach(function(q){if(q.quoteId.indexOf(prefix)===0)cnt++;});
+  var newQid=prefix+String(cnt+1).padStart(2,'0');
+  var d={id:id||makeId('qt'),quoteId:old?old.quoteId:newQid,accountName:accountName,totalPrice:totalPrice,lines:tempLines,unitPrice:up,note:document.getElementById('qf-note').value.trim(),confirmed:old?old.confirmed:false,createdAt:old?old.createdAt:new Date().toISOString().slice(0,10)};
+  if(id){var idx=QUOTES.findIndex(function(x){return x.id===id;});if(idx>-1)QUOTES[idx]=d;}else{QUOTES.push(d);}
+  saveOne('QUOTES');refreshQuoteTable();showToast('报价单保存成功：'+d.quoteId);document.getElementById('quote-modal').remove();
+}
+
+// ============ 3. 确认单 ============
+function genConfirmId(accountName){
+  var date=new Date().toISOString().slice(0,10).replace(/-/g,'');var prefix='C-TR-'+accountName+'-'+date+'-';
+  var cnt=0;CONFIRMS.forEach(function(c){if(c.confirmId.indexOf(prefix)===0)cnt++;});
+  return prefix+String(cnt+1).padStart(2,'0');
+}
+function renderConfirmPage(){
+  document.getElementById('page-confirm').innerHTML='<div class="section"><div class="section-header"><span>📝 确认单列表（'+CONFIRMS.length+'份）</span><div style="display:flex;gap:8px;"><button class="btn btn-danger btn-sm" onclick="batchDelConfirm()">🗑 批量删除</button><button class="btn btn-primary btn-sm" onclick="openConfirmForm()">+ 生成确认单</button></div></div><input type="text" id="confirm-search" placeholder="搜索确认单ID..." style="width:280px;margin-bottom:1rem;" oninput="refreshConfirmTable()"><div class="table-wrap"><table><thead><tr><th class="check-col"><input type="checkbox" onchange="toggleAll(this,\'cb-confirm\')"></th><th>确认单ID</th><th>关联报价单</th><th>主播</th><th>DDL</th><th>签字状态</th><th>操作</th></tr></thead><tbody id="confirm-tbody"></tbody></table></div></div>';
+  refreshConfirmTable();
+}
+function batchDelConfirm(){
+  var ids=getCheckedIds('cb-confirm');if(!ids.length){showToast('请选中');return;}
+  var confirmIds=[],quoteIds=[];
+  ids.forEach(function(id){var c=CONFIRMS.find(function(x){return x.id===id;});if(c){confirmIds.push(c.confirmId);if(quoteIds.indexOf(c.quoteId)===-1)quoteIds.push(c.quoteId);}});
+  var act=0,ap=0;
+  CONTENTS.forEach(function(ct){if(confirmIds.indexOf(ct.confirmId)!==-1)act++;});
+  PAYMENTS.forEach(function(p){if(confirmIds.indexOf(p.confirmId)!==-1)ap++;});
+  if(!confirm('⚠️ 第一次确认：删除 '+ids.length+' 条确认单？\n关联的 '+act+' 条内容和 '+ap+' 条付款也将被删除。'))return;
+  if(!confirm('⚠️ 第二次确认：此操作不可恢复！确定继续？'))return;
+  quoteIds.forEach(function(qid){var q=findQuote(qid);if(q)q.confirmed=false;});
+  CONTENTS=CONTENTS.filter(function(ct){return confirmIds.indexOf(ct.confirmId)===-1;});
+  PAYMENTS=PAYMENTS.filter(function(p){return confirmIds.indexOf(p.confirmId)===-1;});
+  CONFIRMS=CONFIRMS.filter(function(x){return ids.indexOf(x.id)===-1;});
+  saveOne('QUOTES');saveOne('CONFIRMS');saveOne('CONTENTS');saveOne('PAYMENTS');
+  refreshConfirmTable();refreshQuoteTable();refreshContentTable();refreshPaymentTable();
+  showToast('已删除确认单及关联内容('+act+')和付款('+ap+')');
+}
+function refreshConfirmTable(){
+  var s=(document.getElementById('confirm-search')?.value||'').toLowerCase();
+  var list=CONFIRMS.filter(function(c){return c.confirmId.toLowerCase().indexOf(s)>-1;});
+  var tb=document.getElementById('confirm-tbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="7" class="empty">暂无</td></tr>';return;}
+  tb.innerHTML=list.map(function(c){
+    return'<tr><td class="check-col"><input type="checkbox" id="cb-confirm-'+c.id+'" data-id="'+c.id+'"></td><td><strong>'+c.confirmId+'</strong></td><td>'+c.quoteId+'</td><td>'+c.accountName+'</td><td>'+c.deadline+'</td><td><span class="badge '+(c.signed?'b-signed':'b-pending')+'">'+(c.signed?'已签字':'待签字')+'</span></td><td><button class="action-btn" onclick="viewConfirm(\''+c.id+'\')">👁️</button><button class="action-btn" onclick="openConfirmForm(\''+c.id+'\')">✏️</button><button class="action-btn del" onclick="deleteSingleConfirm(\''+c.id+'\',\''+c.confirmId+'\',\''+c.quoteId+'\')">✕</button></td></tr>';
+  }).join('');
+}
+function deleteSingleConfirm(id,confirmId,quoteId){
+  var act=0,ap=0;
+  CONTENTS.forEach(function(ct){if(ct.confirmId===confirmId)act++;});
+  PAYMENTS.forEach(function(p){if(p.confirmId===confirmId)ap++;});
+  if(!confirm('⚠️ 第一次确认：删除该确认单？\n关联的 '+act+' 条内容和 '+ap+' 条付款也将被删除。'))return;
+  if(!confirm('⚠️ 第二次确认：此操作不可恢复！确定继续？'))return;
+  var q=findQuote(quoteId);if(q)q.confirmed=false;
+  CONTENTS=CONTENTS.filter(function(ct){return ct.confirmId!==confirmId;});
+  PAYMENTS=PAYMENTS.filter(function(p){return p.confirmId!==confirmId;});
+  CONFIRMS=CONFIRMS.filter(function(x){return x.id!==id;});
+  saveOne('QUOTES');saveOne('CONFIRMS');saveOne('CONTENTS');saveOne('PAYMENTS');
+  refreshConfirmTable();refreshQuoteTable();refreshContentTable();refreshPaymentTable();
+  showToast('已删除确认单及关联内容('+act+')和付款('+ap+')');
+}
+function openConfirmForm(id){
+  var cf=id?CONFIRMS.find(function(x){return x.id===id;}):null;var isEdit=!!cf;
+  var h='<div class="modal-overlay" id="confirm-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>'+(isEdit?'编辑':'生成')+'确认单</h3>';
+  h+='<div class="form-grid"><div class="form-group"><label>报价单ID *</label><div class="autocomplete-wrap"><input id="cnf-quote-search" value="'+(cf?cf.quoteId:'')+'" placeholder="输入报价单ID" autocomplete="off" '+(isEdit?'readonly':'')+'><div class="autocomplete-list" id="cnf-quote-list"></div></div></div>';
+  h+='<div class="form-group"><label>DDL</label><input type="date" id="cnf-deadline" value="'+(cf?cf.deadline:new Date(Date.now()+60*86400000).toISOString().slice(0,10))+'"></div>';
+  h+='<div class="form-group"><label>KOL Email</label><input type="email" id="cnf-email" value="'+(cf?cf.email:'')+'" placeholder="自动获取"></div></div>';
+  h+='<button class="btn btn-sm" onclick="searchQuoteForConfirm()">🔍 查询报价单</button><div id="cnf-search-info" style="margin:1rem 0;padding:1rem;background:var(--bg2);border-radius:var(--radius);display:none;"></div>';
+  h+='<div class="section" style="background:var(--bg2);margin-top:1rem;display:none;" id="cnf-preview-section"><div class="section-header">📧 确认单文本 <button class="btn btn-xs" onclick="copyConfirmText()">📋 复制</button></div><div id="cnf-preview" style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg);border-radius:var(--radius);"></div></div>';
+  h+='<div class="form-group" style="margin-top:1rem;"><label>上传签字截图</label><input type="file" id="sig-upload" accept="image/*" onchange="previewSig(this)"></div><div id="sig-preview" style="margin-top:0.5rem;">'+(cf&&cf.signed?'<img src="'+cf.signature+'" style="max-width:300px;"> <button class="btn btn-xs" onclick="clearSig()">清除</button>':'')+'</div>';
+  h+='<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" onclick="doSaveConfirm(\''+(cf?cf.id:'')+'\')">保存</button><button class="btn" onclick="document.getElementById(\'confirm-modal\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+  var usedIds=CONFIRMS.map(function(c){return c.quoteId;});
+  var availableIds=QUOTES.filter(function(q){return usedIds.indexOf(q.quoteId)===-1;}).map(function(q){return q.quoteId;});
+  if(isEdit&&cf)availableIds.push(cf.quoteId);
+  setupAutoComplete('cnf-quote-search','cnf-quote-list',availableIds);
+  if(cf){searchQuoteForConfirm(cf.quoteId);}
+}
+function searchQuoteForConfirm(forceQid){
+  var qid=forceQid||document.getElementById('cnf-quote-search').value.trim();if(!qid){showToast('请输入报价单ID');return;}
+  var q=findQuote(qid);if(!q){showToast('报价单不存在');return;}
+  if(!forceQid){if(CONFIRMS.find(function(c){return c.quoteId===qid;})){showToast('该报价单已有确认单');return;}}
+  document.getElementById('cnf-search-info').style.display='block';
+  document.getElementById('cnf-search-info').innerHTML='<strong>'+q.quoteId+'</strong> | '+q.accountName+' | $'+q.totalPrice.toFixed(2)+'<br>'+q.lines.map(function(l){return l.platform+' '+l.count+l.contentType;}).join(', ');
+  var kol=findKol(q.accountName);if(kol&&kol.email)document.getElementById('cnf-email').value=kol.email;
+  document.getElementById('cnf-preview-section').style.display='block';
+  document.getElementById('cnf-preview').textContent=buildConfirmText(q,document.getElementById('cnf-deadline').value);
+}
+function buildConfirmText(q,deadline){
+  return'Merhaba '+q.accountName+',\n\nLütfen aşağıdaki iş birliği detaylarını onaylayınız:\n\n- Platform: '+[...new Set(q.lines.map(function(l){return l.platform;}))].join(', ')+'\n- İçerik: '+q.lines.map(function(l){return l.platform+': '+l.count+l.contentType;}).join('\n')+'\n- Paylaşım Tarihi (DDL): '+deadline+'\n- Ücret: $'+q.totalPrice.toFixed(2)+'\n- Ödeme: İçerik paylaşıldıktan sonra 15 iş günü içerisinde\n- 90 günlük (3 ay) Spark Ads kullanım izni dahildir\n- Lütfen paylaşım sonrasında 90 gün geçerli Spark Code\'u iletiniz\n\nBilgileriniz doğru ise lütfen imzalayarak teyit ediniz.\n\nTeşekkür ederiz.';
+}
+function copyConfirmText(){navigator.clipboard.writeText(document.getElementById('cnf-preview').textContent).then(function(){showToast('已复制');});}
+function previewSig(input){if(input.files[0]){var r=new FileReader();r.onload=function(e){document.getElementById('sig-preview').innerHTML='<img src="'+e.target.result+'" style="max-width:300px;"> <button class="btn btn-xs" onclick="clearSig()">清除</button>';};r.readAsDataURL(input.files[0]);}}
+function clearSig(){document.getElementById('sig-upload').value='';document.getElementById('sig-preview').innerHTML='';}
+function doSaveConfirm(id){
+  var qid=document.getElementById('cnf-quote-search').value.trim();if(!qid){showToast('请输入报价单ID');return;}
+  var q=findQuote(qid);if(!q){showToast('报价单不存在');return;}
+  if(!id&&CONFIRMS.find(function(c){return c.quoteId===qid;})){showToast('已有确认单');return;}
+  var sigFile=document.getElementById('sig-upload').files[0];var old=id?CONFIRMS.find(function(x){return x.id===id;}):null;
+  function finish(sigData){
+    var wasSigned=old?old.signed:false;var nowSigned=!!sigData;
+    var d={id:id||makeId('cnf'),confirmId:old?old.confirmId:genConfirmId(q.accountName),quoteId:qid,accountName:q.accountName,email:document.getElementById('cnf-email').value.trim(),deadline:document.getElementById('cnf-deadline').value,signed:nowSigned,signature:sigData||''};
+    if(id){var i=CONFIRMS.findIndex(function(x){return x.id===id;});if(i>-1)CONFIRMS[i]=d;}else{CONFIRMS.push(d);}
+    if(nowSigned&&!wasSigned){q.confirmed=true;showToast('签字已上传，报价单自动确认');}else if(!nowSigned&&wasSigned){q.confirmed=false;showToast('签字已清除');}
+    saveOne('QUOTES');saveOne('CONFIRMS');refreshConfirmTable();refreshQuoteTable();document.getElementById('confirm-modal').remove();
+  }
+  if(sigFile){var r=new FileReader();r.onload=function(e){finish(e.target.result);};r.readAsDataURL(sigFile);}else{finish(old?old.signature:'');}
+}
+function viewConfirm(id){
+  var c=CONFIRMS.find(function(x){return x.id===id;});if(!c)return;
+  var q=findQuote(c.quoteId);
+  var text=q?buildConfirmText(q,c.deadline):'报价单丢失';
+  var h='<div class="modal-overlay" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>确认单 '+c.confirmId+'</h3>';
+  h+='<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;padding:1rem;background:var(--bg2);border-radius:var(--radius);">'+text+'</div>';
+  if(c.signed){h+='<div style="margin-top:1rem;"><strong>✍️ 签字截图：</strong><br><img src="'+c.signature+'" style="max-width:300px;border:1px solid var(--border);border-radius:var(--radius);"></div>';}
+  else{h+='<p style="color:var(--text2);margin-top:1rem;">⚠️ 尚未签字</p>';}
+  h+='<button class="btn" style="margin-top:1rem;" onclick="this.closest(\'.modal-overlay\').remove()">关闭</button></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+}
+
+// ============ 4. 内容上传（增加播放量） ============
+function genContentId(accountName){
+  var date=new Date().toISOString().slice(0,10).replace(/-/g,'');var prefix='CT-TR-'+accountName+'-'+date+'-';
+  var cnt=0;CONTENTS.forEach(function(c){if(c.contentId.indexOf(prefix)===0)cnt++;});
+  return prefix+String(cnt+1).padStart(2,'0');
+}
+function getUploaded(cid){var ct=CONTENTS.find(function(c){return c.confirmId===cid;});return ct?(ct.files||[]).length:0;}
+function getRequired(cid){var cf=findConfirm(cid);if(!cf)return 0;var q=findQuote(cf.quoteId);return q?q.lines.reduce(function(s,l){return s+l.count;},0):0;}
+function renderContentPage(){
+  document.getElementById('page-content').innerHTML='<div class="section"><div class="section-header"><span>📤 内容列表（'+CONTENTS.length+'条）</span><div style="display:flex;gap:8px;"><button class="btn btn-danger btn-sm" onclick="batchDelContent()">🗑 批量删除</button><button class="btn btn-primary btn-sm" onclick="openContentForm()">+ 上传内容</button></div></div><input type="text" id="content-search" placeholder="搜索内容ID..." style="width:280px;margin-bottom:1rem;" oninput="refreshContentTable()"><div class="table-wrap"><table><thead><tr><th class="check-col"><input type="checkbox" onchange="toggleAll(this,\'cb-content\')"></th><th>内容ID</th><th>确认单</th><th>主播</th><th>进度</th><th>文件</th><th>操作</th></tr></thead><tbody id="content-tbody"></tbody></table></div></div>';
+  refreshContentTable();
+}
+function batchDelContent(){var ids=getCheckedIds('cb-content');if(!ids.length){showToast('请选中');return;}if(!confirm('删除'+ids.length+'条？'))return;CONTENTS=CONTENTS.filter(function(x){return ids.indexOf(x.id)===-1;});saveOne('CONTENTS');refreshContentTable();showToast('已删除');}
+function refreshContentTable(){
+  var s=(document.getElementById('content-search')?.value||'').toLowerCase();
+  var list=CONTENTS.filter(function(c){return c.contentId.toLowerCase().indexOf(s)>-1;});
+  var tb=document.getElementById('content-tbody');if(!list.length){tb.innerHTML='<tr><td colspan="7" class="empty">暂无</td></tr>';return;}
+  tb.innerHTML=list.map(function(ct){var cf=findConfirm(ct.confirmId),q=cf?findQuote(cf.quoteId):null,total=q?q.lines.reduce(function(s,l){return s+l.count;},0):0,up=(ct.files||[]).length;return'<tr><td class="check-col"><input type="checkbox" id="cb-content-'+ct.id+'" data-id="'+ct.id+'"></td><td><strong>'+ct.contentId+'</strong></td><td>'+ct.confirmId+'</td><td>'+(cf?cf.accountName:'—')+'</td><td><span class="badge '+(up>=total?'b-yes':'b-pending')+'">'+up+'/'+total+'</span></td><td>'+(ct.files||[]).map(function(f){return'<a href="'+f.link+'" target="_blank">'+f.type+'</a> ('+(f.date||'—')+') 👀'+(f.views||0);}).join(', ')+'</td><td><button class="action-btn" onclick="openContentForm(\''+ct.id+'\')">✏️</button><button class="action-btn del" onclick="if(confirm(\'删除？\')){CONTENTS=CONTENTS.filter(function(x){return x.id!==\''+ct.id+'\'});saveOne(\'CONTENTS\');refreshContentTable();}">✕</button></td></tr>';}).join('');
+}
+function openContentForm(id){
+  var ct=id?CONTENTS.find(function(x){return x.id===id;}):null;
+  var h='<div class="modal-overlay" id="content-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>'+(ct?'编辑':'上传')+'内容</h3>';
+  h+='<div class="form-grid"><div class="form-group"><label>确认单ID *</label><input id="cnt-search" value="'+(ct?ct.confirmId:'')+'" placeholder="输入确认单ID" '+(ct?'readonly':'')+'></div></div>';
+  h+='<button class="btn btn-sm" onclick="searchForContent()">🔍 查询</button>';
+  h+='<div id="cnt-info" style="margin:1rem 0;padding:1rem;background:var(--bg2);border-radius:var(--radius);display:none;"></div>';
+  h+='<div id="cnt-upload-section" style="display:none;margin-top:1rem;"><strong>按需上传（每条独立日期和播放量）</strong><div id="cnt-files"></div></div>';
+  h+='<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" id="cnt-save-btn" style="display:none;" onclick="doSaveContent(\''+(ct?ct.id:'')+'\')">保存</button><button class="btn" onclick="document.getElementById(\'content-modal\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);if(ct)searchForContent(ct.confirmId);
+}
+function searchForContent(forceCid){
+  var cid=forceCid||document.getElementById('cnt-search').value.trim();if(!cid){showToast('请输入确认单ID');return;}
+  var cf=findConfirm(cid);if(!cf){showToast('确认单不存在或已被删除');return;}if(!cf.signed){showToast('未签字');return;}
+  var q=findQuote(cf.quoteId);if(!q){showToast('报价单丢失');return;}
+  document.getElementById('cnt-info').style.display='block';document.getElementById('cnt-info').innerHTML='<strong>'+cid+'</strong> | '+cf.accountName+' | DDL: '+cf.deadline;
+  var ec=CONTENTS.find(function(c){return c.confirmId===cid;}),ef=ec?ec.files:[];
+  document.getElementById('cnt-upload-section').style.display='block';var fd=document.getElementById('cnt-files');fd.innerHTML='';
+  q.lines.forEach(function(l,idx){for(var j=0;j<l.count;j++){var rid='req-'+idx+'-'+j,ex=ef.find(function(f){return f.reqId===rid;}),row=document.createElement('div');row.className='platform-row';row.innerHTML='<div class="form-group"><label>'+l.platform+' '+l.contentType+' #'+(j+1)+'</label><input id="cnt-link-'+rid+'" placeholder="链接" value="'+(ex?ex.link:'')+'" style="width:180px;"></div><div class="form-group"><label>日期</label><input type="date" id="cnt-date-'+rid+'" value="'+(ex?ex.date:'')+'"></div><div class="form-group"><label>播放量</label><input type="number" id="cnt-views-'+rid+'" value="'+(ex?ex.views:'')+'" placeholder="0" style="width:80px;"></div>';fd.appendChild(row);}});
+  document.getElementById('cnt-save-btn').style.display='inline-flex';
+}
+function doSaveContent(id){
+  var cid=document.getElementById('cnt-search').value.trim();if(!cid){showToast('请输ID');return;}var cf=findConfirm(cid),q=findQuote(cf.quoteId);
+  var files=[],hasAny=false;
+  document.querySelectorAll('#cnt-files .platform-row').forEach(function(row){
+    var li=row.querySelector('input[id^="cnt-link-"]'),di=row.querySelector('input[type="date"]'),vi=row.querySelector('input[id^="cnt-views-"]'),la=row.querySelector('label');
+    var l=li?li.value.trim():'',d=di?di.value:'',v=vi?parseInt(vi.value)||0:0,lb=la?la.textContent:'',rid=li?li.id.replace('cnt-link-',''):'';
+    if(l){hasAny=true;files.push({reqId:rid,type:lb,link:l,date:d||'',views:v});}
+  });
+  if(!hasAny){showToast('请上传至少一条');return;}var ct=id?CONTENTS.find(function(x){return x.id===id;}):null;
+  var d={id:id||makeId('cnt'),contentId:ct?ct.contentId:genContentId(cf.accountName),confirmId:cid,files:files,uploadDate:new Date().toISOString().slice(0,10)};
+  if(id){var i=CONTENTS.findIndex(function(x){return x.id===id;});if(i>-1)CONTENTS[i]=d;}else{CONTENTS.push(d);}
+  saveOne('CONTENTS');refreshContentTable();var total=q.lines.reduce(function(s,l){return s+l.count;},0);showToast('保存成功（'+files.length+'条）'+(files.length>=total?' 🎉':''));
+  document.getElementById('content-modal').remove();
+}
+
+// ============ 5. 付款 ============
+function genPaymentId(accountName){var date=new Date().toISOString().slice(0,10).replace(/-/g,''),prefix='P-TR-'+accountName+'-'+date+'-',cnt=0;PAYMENTS.forEach(function(p){if(p.paymentId.indexOf(prefix)===0)cnt++;});return prefix+String(cnt+1).padStart(2,'0');}
+function renderPaymentPage(){
+  document.getElementById('page-payment').innerHTML='<div class="section"><div class="section-header"><span>💳 付款列表（'+PAYMENTS.length+'笔）</span><div style="display:flex;gap:8px;"><button class="btn btn-danger btn-sm" onclick="batchDelPayment()">🗑 批量删除</button><button class="btn btn-primary btn-sm" onclick="openPaymentForm()">+ 新建付款</button></div></div><input type="text" id="payment-search" placeholder="搜索付款单ID..." style="width:280px;margin-bottom:1rem;" oninput="refreshPaymentTable()"><div class="table-wrap"><table><thead><tr><th class="check-col"><input type="checkbox" onchange="toggleAll(this,\'cb-payment\')"></th><th>付款单ID</th><th>确认单</th><th>主播</th><th>金额</th><th>日期</th><th>状态</th><th>操作</th></tr></thead><tbody id="payment-tbody"></tbody></table></div></div>';
+  refreshPaymentTable();
+}
+function batchDelPayment(){var ids=getCheckedIds('cb-payment');if(!ids.length){showToast('请选中');return;}if(!confirm('删除'+ids.length+'条？'))return;PAYMENTS=PAYMENTS.filter(function(x){return ids.indexOf(x.id)===-1;});saveOne('PAYMENTS');refreshPaymentTable();showToast('已删除');}
+function refreshPaymentTable(){
+  var s=(document.getElementById('payment-search')?.value||'').toLowerCase(),list=PAYMENTS.filter(function(p){return p.paymentId.toLowerCase().indexOf(s)>-1;}),tb=document.getElementById('payment-tbody');
+  if(!list.length){tb.innerHTML='<tr><td colspan="8" class="empty">暂无</td></tr>';return;}
+  tb.innerHTML=list.map(function(p){var cf=findConfirm(p.confirmId);return'<tr><td class="check-col"><input type="checkbox" id="cb-payment-'+p.id+'" data-id="'+p.id+'"></td><td><strong>'+p.paymentId+'</strong></td><td>'+p.confirmId+'</td><td>'+(cf?cf.accountName:'—')+'</td><td>$'+p.amount.toFixed(2)+'</td><td>'+p.paymentDate+'</td><td><span class="badge '+(p.paid?'b-paid':'b-unpaid')+'">'+(p.paid?'已付':'待付')+'</span></td><td><button class="action-btn" onclick="openPaymentForm(\''+p.id+'\')">✏️</button><button class="action-btn del" onclick="if(confirm(\'删除？\')){PAYMENTS=PAYMENTS.filter(function(x){return x.id!==\''+p.id+'\'});saveOne(\'PAYMENTS\');refreshPaymentTable();}">✕</button></td></tr>';}).join('');
+}
+function openPaymentForm(id){
+  var p=id?PAYMENTS.find(function(x){return x.id===id;}):null;
+  var h='<div class="modal-overlay" id="payment-modal" onclick="if(event.target===this)this.remove()"><div class="modal"><h3>'+(p?'编辑':'新建')+'付款</h3>';
+  h+='<div class="form-grid"><div class="form-group"><label>确认单ID *</label><input id="pm-search" value="'+(p?p.confirmId:'')+'" placeholder="输入确认单ID" '+(p?'readonly':'')+'></div>';
+  h+='<div class="form-group"><label>金额($)</label><input type="number" id="pm-amount" step="0.01" value="'+(p?p.amount:'')+'" readonly></div>';
+  h+='<div class="form-group"><label>付款日期</label><input type="date" id="pm-date" value="'+(p?p.paymentDate:new Date().toISOString().slice(0,10))+'"></div>';
+  h+='<div class="form-group"><label>状态</label><select id="pm-paid"><option value="0"'+(p&&!p.paid?' selected':'')+'>待付款</option><option value="1"'+(p&&p.paid?' selected':'')+'>已付款</option></select></div>';
+  h+='<div class="form-group"><label>备注</label><input id="pm-note" value="'+(p?p.note:'')+'"></div></div>';
+  h+='<button class="btn btn-sm" onclick="searchForPayment()">🔍 查询</button><div id="pm-info" style="margin:1rem 0;padding:1rem;background:var(--bg2);border-radius:var(--radius);display:none;"></div>';
+  h+='<div style="display:flex;gap:10px;margin-top:1rem;"><button class="btn btn-primary" id="pm-save-btn" style="display:none;" onclick="doSavePayment(\''+(p?p.id:'')+'\')">保存</button><button class="btn" onclick="document.getElementById(\'payment-modal\').remove()">取消</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);if(p)searchForPayment(p.confirmId);
+}
+function searchForPayment(forceCid){
+  var cid=forceCid||document.getElementById('pm-search').value.trim();if(!cid){showToast('请输入ID');return;}var cf=findConfirm(cid);if(!cf){showToast('确认单不存在或已被删除');return;}if(!cf.signed){showToast('未签字');return;}var q=findQuote(cf.quoteId);if(!q)return;
+  document.getElementById('pm-amount').value=q.totalPrice.toFixed(2);var up=getUploaded(cid),req=getRequired(cid),can=up>=req;
+  document.getElementById('pm-info').style.display='block';document.getElementById('pm-info').innerHTML=cid+' | '+cf.accountName+' | $'+q.totalPrice.toFixed(2)+'<br>进度:'+up+'/'+req+' '+(can?'✅':'❌');
+  document.getElementById('pm-save-btn').style.display=can?'inline-flex':'none';
+}
+function doSavePayment(id){
+  var cid=document.getElementById('pm-search').value.trim();if(!cid){showToast('请输ID');return;}if(getUploaded(cid)<getRequired(cid)){showToast('未全部上传');return;}
+  var cf=findConfirm(cid),q=findQuote(cf.quoteId),amt=parseFloat(document.getElementById('pm-amount').value)||0;if(Math.abs(amt-q.totalPrice)>0.001){showToast('金额不符');return;}
+  var old=id?PAYMENTS.find(function(x){return x.id===id;}):null,d={id:id||makeId('pm'),paymentId:old?old.paymentId:genPaymentId(cf.accountName),confirmId:cid,amount:amt,paymentDate:document.getElementById('pm-date').value,paid:document.getElementById('pm-paid').value==='1',note:document.getElementById('pm-note').value.trim()};
+  if(id){var i=PAYMENTS.findIndex(function(x){return x.id===id;});if(i>-1)PAYMENTS[i]=d;}else{PAYMENTS.push(d);}
+  saveOne('PAYMENTS');refreshPaymentTable();showToast('保存成功');document.getElementById('payment-modal').remove();
+}
+
+// 导出导入
+function exportAll(){
+  var data={KOLS:KOLS,QUOTES:QUOTES,CONFIRMS:CONFIRMS,CONTENTS:CONTENTS,PAYMENTS:PAYMENTS};
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='KOL_TR_backup.json';a.click();showToast('导出成功');
+}
+function importAll(e){
+  var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){try{var d=JSON.parse(ev.target.result);if(d.KOLS)KOLS=d.KOLS;if(d.QUOTES)QUOTES=d.QUOTES;if(d.CONFIRMS)CONFIRMS=d.CONFIRMS;if(d.CONTENTS)CONTENTS=d.CONTENTS;if(d.PAYMENTS)PAYMENTS=d.PAYMENTS;saveAllData();showToast('导入成功');setTimeout(function(){location.reload();},800);}catch(e){showToast('格式错误');}};r.readAsText(f);e.target.value='';}
+
 document.getElementById('page-dashboard').style.display='block';
 renderDashboardPage();
 </script>
